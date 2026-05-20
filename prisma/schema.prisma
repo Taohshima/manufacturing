@@ -1,0 +1,202 @@
+// 製造管理ツール Prismaスキーマ（ドラフト）
+// 詳細は docs/data-model.md を参照
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Division {
+  RAW        // 原料
+  PACKAGING  // 資材
+  PRODUCT    // 製品
+}
+
+enum PurchaseOrderStatus {
+  PLANNED    // 未発注
+  ORDERED    // 発注済
+  ARRIVED    // 到着済
+  CANCELLED  // キャンセル
+}
+
+enum ManufacturingOrderStatus {
+  PLANNED      // 予定
+  IN_PROGRESS  // 進行中
+  COMPLETED    // 完了
+  CANCELLED    // キャンセル
+}
+
+// ─────────────────────────────────────────────────────────────
+// Master tables
+// ─────────────────────────────────────────────────────────────
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  division  Division
+  name      String
+
+  materials Material[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([division, name])
+}
+
+model Supplier {
+  id              Int      @id @default(autoincrement())
+  companyName     String
+  officeName      String?
+  postalCode      String?
+  address         String?
+  phone           String?
+  fax             String?
+  websiteUrl      String?
+  contactPerson   String?
+  email           String?
+  orderMethod     String?
+  paymentMethod   String?
+  paymentDay      Int?
+  paymentDivision String?
+  paymentSite     String?
+  searchLabel     String?
+  alias           String?
+
+  materials       Material[]
+  purchaseOrders  PurchaseOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Material {
+  id                  Int       @id @default(autoincrement())
+  name                String
+  categoryId          Int
+  category            Category  @relation(fields: [categoryId], references: [id])
+  unit                String
+  purchasePrice       Decimal?  @db.Decimal(14, 4)
+  stockQty            Decimal   @default(0) @db.Decimal(14, 4)
+  lastInventoryDate   DateTime? @db.Date
+  supplierId          Int?
+  supplier            Supplier? @relation(fields: [supplierId], references: [id])
+  relatedAromaKyokai  Boolean   @default(false)
+  relatedTenman       Boolean   @default(false)
+  consignedTenman     Decimal?  @db.Decimal(14, 4)
+  consignedAroma      Decimal?  @db.Decimal(14, 4)
+  consignedOther      Decimal?  @db.Decimal(14, 4)
+  notes               String?
+  storageLocation     String?
+  division            Division
+  docUrl              String?
+
+  recipes        ProductRecipe[]
+  purchaseOrders PurchaseOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+  @@index([categoryId])
+}
+
+model Product {
+  id                Int       @id @default(autoincrement())
+  salesName         String
+  genericName       String?
+  standardNo        String?
+  capacity          Decimal   @db.Decimal(14, 4)
+  capacityUnit      String
+  controlDivision   String?
+  expiryMonths      Int?
+  caseCount         Int?
+  storageLocation   String?
+  salesPrice        Decimal?  @db.Decimal(14, 2)
+  productCost       Decimal?  @db.Decimal(14, 2)
+  stockQty          Decimal?  @db.Decimal(14, 4)
+  lastInventoryDate DateTime? @db.Date
+
+  recipes              ProductRecipe[]
+  manufacturingOrders  ManufacturingOrder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([salesName])
+}
+
+model ProductRecipe {
+  id         Int      @id @default(autoincrement())
+  productId  Int
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  materialId Int
+  material   Material @relation(fields: [materialId], references: [id])
+  usageQty   Decimal  @db.Decimal(14, 4)
+  usageUnit  String
+  sortOrder  Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, materialId])
+  @@index([productId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Transaction tables
+// ─────────────────────────────────────────────────────────────
+
+model PurchaseOrder {
+  id                Int                 @id @default(autoincrement())
+  materialId        Int
+  material          Material            @relation(fields: [materialId], references: [id])
+  supplierId        Int
+  supplier          Supplier            @relation(fields: [supplierId], references: [id])
+  orderedAt         DateTime?           @db.Date
+  orderedQty        Decimal             @db.Decimal(14, 4)
+  unitPrice         Decimal?            @db.Decimal(14, 4)
+  status            PurchaseOrderStatus @default(PLANNED)
+  expectedArrivalAt DateTime?           @db.Date
+  arrivedAt         DateTime?           @db.Date
+  arrivedQty        Decimal?            @db.Decimal(14, 4)
+  notes             String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([materialId])
+  @@index([status, expectedArrivalAt])
+}
+
+model ManufacturingOrder {
+  id            Int                      @id @default(autoincrement())
+  productId     Int
+  product       Product                  @relation(fields: [productId], references: [id])
+  orderedAt     DateTime?                @db.Date  // 受注日
+  instructedAt  DateTime                 @db.Date  // 指示年月日
+  scheduledAt   DateTime?                @db.Date  // 製造予定日
+  plannedQty    Decimal                  @db.Decimal(14, 4)
+  mixedAt       DateTime?                @db.Date
+  filledAt      DateTime?                @db.Date
+  packagedAt    DateTime?                @db.Date
+  lotNumber     String?
+  completedQty  Decimal?                 @db.Decimal(14, 4)
+  standardNo    String?
+  status        ManufacturingOrderStatus @default(PLANNED)
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId])
+  @@index([status, scheduledAt])
+  @@index([instructedAt])
+}
