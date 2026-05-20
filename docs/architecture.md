@@ -53,6 +53,7 @@
 |--------|------|
 | `/manufacturing-orders` | 製造指示一覧・新規作成・編集・削除。製品名・数量・指示日（≒受注日）・製造予定日・ロット番号 |
 | `/manufacturing-orders/[id]` | 詳細。BOMから必要資材一覧を自動算出し、在庫との差分を表示 |
+| `/manufacturing-orders/[id]/print` | 製造記録の印刷用ビュー（製品標準書 ロット記録用紙の様式） → 詳細は [docs/print-template.md](print-template.md) |
 | `/purchase-orders` | 資材発注一覧。資材名・発注先・発注日・数量・状況（未発注/発注済/到着済）・到着見込日 |
 | `/` | ダッシュボード。製造予定・発注予定・在庫不足アラート |
 
@@ -98,12 +99,24 @@
 ```
 ある製造指示 (Product=P, Quantity=N) について：
   必要資材 = ProductRecipe[P] の各行について
-    必要量 = 利用量 × N / Product.容量
+    必要量 = 利用量 × N
   各資材について：
-    不足量 = 必要量 - Material.在庫数量
+    不足量 = 必要量 - Material.stockQty
     if 不足量 > 0:
       未到着発注を差し引いてさらに不足する場合 → アラート
 ```
+
+## 在庫の自動更新（StockTransaction）
+
+`Material.stockQty` は `StockTransaction` の集計から自動更新するキャッシュ値。
+直接更新はせず、必ず `StockTransaction` の作成と同一トランザクションで `increment`/`decrement` を行う。
+
+| 発生イベント | StockTransaction | Material.stockQty |
+|-------------|-------------------|--------------------|
+| PurchaseOrder → ARRIVED | `reason=PURCHASE_ARRIVAL, qty=+arrivedQty` | `+= arrivedQty` |
+| ManufacturingOrder → COMPLETED | 各原料・資材ごとに `reason=MANUFACTURING_USE, qty=-actualQty` | `-= actualQty` |
+| 棚卸時の差分調整 | `reason=INVENTORY_ADJUST, qty=実数-現在値` | 実数になる |
+| 手動補正 | `reason=MANUAL, qty=±N` | `±= N` |
 
 ## 実装フェーズ
 

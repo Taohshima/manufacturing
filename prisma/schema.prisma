@@ -34,6 +34,19 @@ enum ManufacturingOrderStatus {
   CANCELLED    // キャンセル
 }
 
+// 在庫増減の理由を分類するエンタイア
+enum StockTransactionReason {
+  PURCHASE_ARRIVAL   // 発注到着（PurchaseOrder起源）
+  MANUFACTURING_USE  // 製造で消費（ManufacturingOrder起源）
+  INVENTORY_ADJUST   // 棚卸調整
+  MANUAL             // 手動補正
+}
+
+enum CheckResult {
+  OK   // 適
+  NG   // 不適
+}
+
 // ─────────────────────────────────────────────────────────────
 // Master tables
 // ─────────────────────────────────────────────────────────────
@@ -84,22 +97,29 @@ model Material {
   category            Category  @relation(fields: [categoryId], references: [id])
   unit                String
   purchasePrice       Decimal?  @db.Decimal(14, 4)
+
+  // stockQty は StockTransaction の合計から自動算出される値を保持する
+  // キャッシュカラム。更新は必ず StockTransaction の作成と同一
+  // トランザクション内で行うこと（直接更新禁止）。
   stockQty            Decimal   @default(0) @db.Decimal(14, 4)
+
   lastInventoryDate   DateTime? @db.Date
   supplierId          Int?
   supplier            Supplier? @relation(fields: [supplierId], references: [id])
-  relatedAromaKyokai  Boolean   @default(false)
-  relatedTenman       Boolean   @default(false)
-  consignedTenman     Decimal?  @db.Decimal(14, 4)
-  consignedAroma      Decimal?  @db.Decimal(14, 4)
-  consignedOther      Decimal?  @db.Decimal(14, 4)
+
+  consignedQty        Decimal?  @db.Decimal(14, 4)   // 預かり在庫数量
+  consignedOwner      String?                         // 預かり元（てんまん／アロマ協会 等）
+
   notes               String?
   storageLocation     String?
   division            Division
   docUrl              String?
 
-  recipes        ProductRecipe[]
-  purchaseOrders PurchaseOrder[]
+  recipes               ProductRecipe[]
+  purchaseOrders        PurchaseOrder[]
+  stockTransactions     StockTransaction[]
+  manufacturingUsages   ManufacturingOrderIngredient[]
+  manufacturingPackages ManufacturingOrderPackaging[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -139,7 +159,7 @@ model ProductRecipe {
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   materialId Int
   material   Material @relation(fields: [materialId], references: [id])
-  usageQty   Decimal  @db.Decimal(14, 4)
+  usageQty   Decimal  @db.Decimal(14, 4)   // １本あたりの利用量
   usageUnit  String
   sortOrder  Int      @default(0)
 
@@ -169,6 +189,8 @@ model PurchaseOrder {
   arrivedQty        Decimal?            @db.Decimal(14, 4)
   notes             String?
 
+  stockTransactions StockTransaction[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -180,18 +202,51 @@ model ManufacturingOrder {
   id            Int                      @id @default(autoincrement())
   productId     Int
   product       Product                  @relation(fields: [productId], references: [id])
+
+  // 基本情報
   orderedAt     DateTime?                @db.Date  // 受注日
-  instructedAt  DateTime                 @db.Date  // 指示年月日
+  instructedAt  DateTime                 @db.Date  // 指図年月日
   scheduledAt   DateTime?                @db.Date  // 製造予定日
-  plannedQty    Decimal                  @db.Decimal(14, 4)
-  mixedAt       DateTime?                @db.Date
-  filledAt      DateTime?                @db.Date
-  packagedAt    DateTime?                @db.Date
-  lotNumber     String?
-  completedQty  Decimal?                 @db.Decimal(14, 4)
-  standardNo    String?
+  plannedQty    Decimal                  @db.Decimal(14, 4)   // 製造数量（本/個）
+  lotNumber     String?                                       // 製造番号・ロット番号
+  standardNo    String?                                       // 製品標準書No
+  instructor    String?                                       // 指図者
   status        ManufacturingOrderStatus @default(PLANNED)
   notes         String?
+
+  // 秤量
+  weighingDate  DateTime?  @db.Date     // 秤量年月日
+  temperature   Decimal?   @db.Decimal(5, 2)   // 温度（℃）
+  humidity      Decimal?   @db.Decimal(5, 2)   // 湿度（%）
+
+  // 混合
+  mixedAt       DateTime?  @db.Date     // 混合年月日
+  mixStartTime  String?                 // 作業開始時刻（HH:mm）
+  mixEndTime    String?                 // 作業終了時刻
+  mixWorker     String?                 // 作業者
+  mixNotes      String?
+
+  // 充填
+  filledAt        DateTime?    @db.Date
+  fillUnitVolume  Decimal?     @db.Decimal(14, 4)   // 充填容量
+  fillUnit        String?                            // g/ml 等
+  fillCount       Int?                               // 個数
+  fillMissCount   Int?                               // 充填ミス数量
+  containerCheck  CheckResult?                       // 容器表示の確認
+  fillWorker      String?
+
+  // 包装
+  packagedAt      DateTime?    @db.Date
+  cardboardSize   String?                             // 段ボールサイズ
+  packagingWorker String?
+  packagingCheck  CheckResult?                        // 包装表示確認
+  lotCheck        CheckResult?                        // ロット確認
+  completedQty    Decimal?     @db.Decimal(14, 4)     // 完成数量
+  sampleQty       Decimal?     @db.Decimal(14, 4)     // 抜取り数量
+
+  ingredients       ManufacturingOrderIngredient[]
+  packagingItems    ManufacturingOrderPackaging[]
+  stockTransactions StockTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -199,4 +254,70 @@ model ManufacturingOrder {
   @@index([productId])
   @@index([status, scheduledAt])
   @@index([instructedAt])
+}
+
+// 製造指示の配合原料行（印刷帳票の「配合原料名」セクションに対応）
+// 通常は Product.recipes をコピーして作成し、実際の秤量結果やロット番号を記録する
+model ManufacturingOrderIngredient {
+  id                   Int                @id @default(autoincrement())
+  manufacturingOrderId Int
+  manufacturingOrder   ManufacturingOrder @relation(fields: [manufacturingOrderId], references: [id], onDelete: Cascade)
+  materialId           Int
+  material             Material           @relation(fields: [materialId], references: [id])
+  perUnitQty           Decimal            @db.Decimal(14, 4)   // １本あたりの容量（指図時点のBOMコピー）
+  perUnitUnit          String
+  plannedQty           Decimal            @db.Decimal(14, 4)   // 指図量 = perUnitQty * ManufacturingOrder.plannedQty
+  actualQty            Decimal?           @db.Decimal(14, 4)   // 秤量
+  materialLotNumber    String?                                 // 原料ロット番号
+  checked              Boolean            @default(false)      // チェック欄
+  sortOrder            Int                @default(0)
+  notes                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([manufacturingOrderId])
+}
+
+// 製造指示の包装資材行（印刷帳票の「包装表示」セクションに対応）
+model ManufacturingOrderPackaging {
+  id                   Int                @id @default(autoincrement())
+  manufacturingOrderId Int
+  manufacturingOrder   ManufacturingOrder @relation(fields: [manufacturingOrderId], references: [id], onDelete: Cascade)
+  materialId           Int?               // 資材マスタへの参照（任意。新規資材も記録可）
+  material             Material?          @relation(fields: [materialId], references: [id])
+  materialName         String                                 // 資材名（自由記述可）
+  materialCode         String?                                // 資材品番
+  usedQty              Decimal?           @db.Decimal(14, 4)  // 使用数量
+  remainingQty         Decimal?           @db.Decimal(14, 4)  // 残数量
+  sortOrder            Int                @default(0)
+  notes                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([manufacturingOrderId])
+}
+
+// 在庫の増減を全件記録する単一の真実の情報源（Source of Truth）
+// Material.stockQty はこのテーブルの集計を反映したキャッシュ値
+model StockTransaction {
+  id          Int                    @id @default(autoincrement())
+  materialId  Int
+  material    Material               @relation(fields: [materialId], references: [id])
+  occurredAt  DateTime               @db.Date
+  qty         Decimal                @db.Decimal(14, 4)   // 増減量。入庫は正、出庫は負
+  reason      StockTransactionReason
+  notes       String?
+
+  // 起源となった伝票への参照（任意）
+  purchaseOrderId      Int?
+  purchaseOrder        PurchaseOrder?      @relation(fields: [purchaseOrderId], references: [id])
+  manufacturingOrderId Int?
+  manufacturingOrder   ManufacturingOrder? @relation(fields: [manufacturingOrderId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([materialId, occurredAt])
+  @@index([reason])
 }

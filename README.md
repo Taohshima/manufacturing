@@ -16,6 +16,7 @@
 
 - [docs/architecture.md](docs/architecture.md) — 技術構成・画面構成・実装フェーズ
 - [docs/data-model.md](docs/data-model.md) — データモデルとPrismaスキーマの設計意図
+- [docs/print-template.md](docs/print-template.md) — 製造記録の印刷帳票仕様
 - [prisma/schema.prisma](prisma/schema.prisma) — Prismaスキーマ（ドラフト）
 
 ## 技術スタック（予定）
