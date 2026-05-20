@@ -15,36 +15,68 @@ datasource db {
 // ─────────────────────────────────────────────────────────────
 
 enum Division {
-  RAW        // 原料
-  PACKAGING  // 資材
-  PRODUCT    // 製品
+  RAW // 原料
+  PACKAGING // 資材
+  PRODUCT // 製品
 }
 
 enum PurchaseOrderStatus {
-  PLANNED    // 未発注
-  ORDERED    // 発注済
-  ARRIVED    // 到着済
-  CANCELLED  // キャンセル
+  PLANNED // 未発注
+  ORDERED // 発注済
+  ARRIVED // 到着済
+  CANCELLED // キャンセル
 }
 
 enum ManufacturingOrderStatus {
-  PLANNED      // 予定
-  IN_PROGRESS  // 進行中
-  COMPLETED    // 完了
-  CANCELLED    // キャンセル
+  PLANNED // 予定
+  IN_PROGRESS // 進行中
+  COMPLETED // 完了
+  CANCELLED // キャンセル
 }
 
 // 在庫増減の理由を分類するエンタイア
 enum StockTransactionReason {
-  PURCHASE_ARRIVAL   // 発注到着（PurchaseOrder起源）
-  MANUFACTURING_USE  // 製造で消費（ManufacturingOrder起源）
-  INVENTORY_ADJUST   // 棚卸調整
-  MANUAL             // 手動補正
+  PURCHASE_ARRIVAL // 発注到着（PurchaseOrder起源）
+  MANUFACTURING_USE // 製造で消費（ManufacturingOrder起源）
+  INVENTORY_ADJUST // 棚卸調整
+  MANUAL // 手動補正
 }
 
 enum CheckResult {
-  OK   // 適
-  NG   // 不適
+  OK // 適
+  NG // 不適
+}
+
+enum ShipmentDecisionStatus {
+  APPROVED // 可
+  REJECTED // 否
+}
+
+// 出荷可否決定通知の「製造所からの出荷可否の決定の記録」「出荷判定基準逸脱」用
+// 有(可/否) ・ 無 の3状態
+enum ApprovalState {
+  YES_OK // 有・可（または 措置 適正）
+  YES_NG // 有・否（または 措置 不適正）
+  NO // 無
+}
+
+// 出荷可否決定通知の「当該製品の試験検査成績書」用
+// 有(適/不適) ・ 無 の3状態
+enum SuitabilityState {
+  YES_FIT // 有・適
+  YES_UNFIT // 有・不適
+  NO // 無
+}
+
+enum ExistenceState {
+  YES // 有
+  NO // 無
+}
+
+// 試験検査記録の判定
+enum TestJudgment {
+  OK // 適
+  NG // 否
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -52,9 +84,9 @@ enum CheckResult {
 // ─────────────────────────────────────────────────────────────
 
 model Category {
-  id        Int      @id @default(autoincrement())
-  division  Division
-  name      String
+  id       Int      @id @default(autoincrement())
+  division Division
+  name     String
 
   materials Material[]
 
@@ -65,7 +97,7 @@ model Category {
 }
 
 model Supplier {
-  id              Int      @id @default(autoincrement())
+  id              Int     @id @default(autoincrement())
   companyName     String
   officeName      String?
   postalCode      String?
@@ -83,37 +115,37 @@ model Supplier {
   searchLabel     String?
   alias           String?
 
-  materials       Material[]
-  purchaseOrders  PurchaseOrder[]
+  materials      Material[]
+  purchaseOrders PurchaseOrder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Material {
-  id                  Int       @id @default(autoincrement())
-  name                String
-  categoryId          Int
-  category            Category  @relation(fields: [categoryId], references: [id])
-  unit                String
-  purchasePrice       Decimal?  @db.Decimal(14, 4)
+  id            Int      @id @default(autoincrement())
+  name          String
+  categoryId    Int
+  category      Category @relation(fields: [categoryId], references: [id])
+  unit          String
+  purchasePrice Decimal? @db.Decimal(14, 4)
 
   // stockQty は StockTransaction の合計から自動算出される値を保持する
   // キャッシュカラム。更新は必ず StockTransaction の作成と同一
   // トランザクション内で行うこと（直接更新禁止）。
-  stockQty            Decimal   @default(0) @db.Decimal(14, 4)
+  stockQty Decimal @default(0) @db.Decimal(14, 4)
 
-  lastInventoryDate   DateTime? @db.Date
-  supplierId          Int?
-  supplier            Supplier? @relation(fields: [supplierId], references: [id])
+  lastInventoryDate DateTime? @db.Date
+  supplierId        Int?
+  supplier          Supplier? @relation(fields: [supplierId], references: [id])
 
-  consignedQty        Decimal?  @db.Decimal(14, 4)   // 預かり在庫数量
-  consignedOwner      String?                         // 預かり元（てんまん／アロマ協会 等）
+  consignedQty   Decimal? @db.Decimal(14, 4) // 預かり在庫数量
+  consignedOwner String? // 預かり元（てんまん／アロマ協会 等）
 
-  notes               String?
-  storageLocation     String?
-  division            Division
-  docUrl              String?
+  notes           String?
+  storageLocation String?
+  division        Division
+  docUrl          String?
 
   recipes               ProductRecipe[]
   purchaseOrders        PurchaseOrder[]
@@ -144,8 +176,9 @@ model Product {
   stockQty          Decimal?  @db.Decimal(14, 4)
   lastInventoryDate DateTime? @db.Date
 
-  recipes              ProductRecipe[]
-  manufacturingOrders  ManufacturingOrder[]
+  recipes             ProductRecipe[]
+  manufacturingOrders ManufacturingOrder[]
+  qualityStandard     QualityStandard?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -159,7 +192,7 @@ model ProductRecipe {
   product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   materialId Int
   material   Material @relation(fields: [materialId], references: [id])
-  usageQty   Decimal  @db.Decimal(14, 4)   // １本あたりの利用量
+  usageQty   Decimal  @db.Decimal(14, 4) // １本あたりの利用量
   usageUnit  String
   sortOrder  Int      @default(0)
 
@@ -199,54 +232,57 @@ model PurchaseOrder {
 }
 
 model ManufacturingOrder {
-  id            Int                      @id @default(autoincrement())
-  productId     Int
-  product       Product                  @relation(fields: [productId], references: [id])
+  id        Int     @id @default(autoincrement())
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
 
   // 基本情報
-  orderedAt     DateTime?                @db.Date  // 受注日
-  instructedAt  DateTime                 @db.Date  // 指図年月日
-  scheduledAt   DateTime?                @db.Date  // 製造予定日
-  plannedQty    Decimal                  @db.Decimal(14, 4)   // 製造数量（本/個）
-  lotNumber     String?                                       // 製造番号・ロット番号
-  standardNo    String?                                       // 製品標準書No
-  instructor    String?                                       // 指図者
-  status        ManufacturingOrderStatus @default(PLANNED)
-  notes         String?
+  orderedAt    DateTime?                @db.Date // 受注日
+  instructedAt DateTime                 @db.Date // 指図年月日
+  scheduledAt  DateTime?                @db.Date // 製造予定日
+  plannedQty   Decimal                  @db.Decimal(14, 4) // 製造数量（本/個）
+  lotNumber    String? // 製造番号・ロット番号
+  standardNo   String? // 製品標準書No
+  instructor   String? // 指図者
+  status       ManufacturingOrderStatus @default(PLANNED)
+  notes        String?
 
   // 秤量
-  weighingDate  DateTime?  @db.Date     // 秤量年月日
-  temperature   Decimal?   @db.Decimal(5, 2)   // 温度（℃）
-  humidity      Decimal?   @db.Decimal(5, 2)   // 湿度（%）
+  weighingDate DateTime? @db.Date // 秤量年月日
+  temperature  Decimal?  @db.Decimal(5, 2) // 温度（℃）
+  humidity     Decimal?  @db.Decimal(5, 2) // 湿度（%）
 
   // 混合
-  mixedAt       DateTime?  @db.Date     // 混合年月日
-  mixStartTime  String?                 // 作業開始時刻（HH:mm）
-  mixEndTime    String?                 // 作業終了時刻
-  mixWorker     String?                 // 作業者
-  mixNotes      String?
+  mixedAt      DateTime? @db.Date // 混合年月日
+  mixStartTime String? // 作業開始時刻（HH:mm）
+  mixEndTime   String? // 作業終了時刻
+  mixWorker    String? // 作業者
+  mixNotes     String?
 
   // 充填
-  filledAt        DateTime?    @db.Date
-  fillUnitVolume  Decimal?     @db.Decimal(14, 4)   // 充填容量
-  fillUnit        String?                            // g/ml 等
-  fillCount       Int?                               // 個数
-  fillMissCount   Int?                               // 充填ミス数量
-  containerCheck  CheckResult?                       // 容器表示の確認
-  fillWorker      String?
+  filledAt       DateTime?    @db.Date
+  fillUnitVolume Decimal?     @db.Decimal(14, 4) // 充填容量
+  fillUnit       String? // g/ml 等
+  fillCount      Int? // 個数
+  fillMissCount  Int? // 充填ミス数量
+  containerCheck CheckResult? // 容器表示の確認
+  fillWorker     String?
 
   // 包装
   packagedAt      DateTime?    @db.Date
-  cardboardSize   String?                             // 段ボールサイズ
+  cardboardSize   String? // 段ボールサイズ
   packagingWorker String?
-  packagingCheck  CheckResult?                        // 包装表示確認
-  lotCheck        CheckResult?                        // ロット確認
-  completedQty    Decimal?     @db.Decimal(14, 4)     // 完成数量
-  sampleQty       Decimal?     @db.Decimal(14, 4)     // 抜取り数量
+  packagingCheck  CheckResult? // 包装表示確認
+  lotCheck        CheckResult? // ロット確認
+  completedQty    Decimal?     @db.Decimal(14, 4) // 完成数量
+  sampleQty       Decimal?     @db.Decimal(14, 4) // 抜取り数量
 
   ingredients       ManufacturingOrderIngredient[]
   packagingItems    ManufacturingOrderPackaging[]
   stockTransactions StockTransaction[]
+  testInspections   TestInspectionRecord[]
+  shipmentDecisions ShipmentDecision[]
+  shipments         Shipment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -264,12 +300,12 @@ model ManufacturingOrderIngredient {
   manufacturingOrder   ManufacturingOrder @relation(fields: [manufacturingOrderId], references: [id], onDelete: Cascade)
   materialId           Int
   material             Material           @relation(fields: [materialId], references: [id])
-  perUnitQty           Decimal            @db.Decimal(14, 4)   // １本あたりの容量（指図時点のBOMコピー）
+  perUnitQty           Decimal            @db.Decimal(14, 4) // １本あたりの容量（指図時点のBOMコピー）
   perUnitUnit          String
-  plannedQty           Decimal            @db.Decimal(14, 4)   // 指図量 = perUnitQty * ManufacturingOrder.plannedQty
-  actualQty            Decimal?           @db.Decimal(14, 4)   // 秤量
-  materialLotNumber    String?                                 // 原料ロット番号
-  checked              Boolean            @default(false)      // チェック欄
+  plannedQty           Decimal            @db.Decimal(14, 4) // 指図量 = perUnitQty * ManufacturingOrder.plannedQty
+  actualQty            Decimal?           @db.Decimal(14, 4) // 秤量
+  materialLotNumber    String? // 原料ロット番号
+  checked              Boolean            @default(false) // チェック欄
   sortOrder            Int                @default(0)
   notes                String?
 
@@ -284,12 +320,12 @@ model ManufacturingOrderPackaging {
   id                   Int                @id @default(autoincrement())
   manufacturingOrderId Int
   manufacturingOrder   ManufacturingOrder @relation(fields: [manufacturingOrderId], references: [id], onDelete: Cascade)
-  materialId           Int?               // 資材マスタへの参照（任意。新規資材も記録可）
+  materialId           Int? // 資材マスタへの参照（任意。新規資材も記録可）
   material             Material?          @relation(fields: [materialId], references: [id])
-  materialName         String                                 // 資材名（自由記述可）
-  materialCode         String?                                // 資材品番
-  usedQty              Decimal?           @db.Decimal(14, 4)  // 使用数量
-  remainingQty         Decimal?           @db.Decimal(14, 4)  // 残数量
+  materialName         String // 資材名（自由記述可）
+  materialCode         String? // 資材品番
+  usedQty              Decimal?           @db.Decimal(14, 4) // 使用数量
+  remainingQty         Decimal?           @db.Decimal(14, 4) // 残数量
   sortOrder            Int                @default(0)
   notes                String?
 
@@ -302,13 +338,13 @@ model ManufacturingOrderPackaging {
 // 在庫の増減を全件記録する単一の真実の情報源（Source of Truth）
 // Material.stockQty はこのテーブルの集計を反映したキャッシュ値
 model StockTransaction {
-  id          Int                    @id @default(autoincrement())
-  materialId  Int
-  material    Material               @relation(fields: [materialId], references: [id])
-  occurredAt  DateTime               @db.Date
-  qty         Decimal                @db.Decimal(14, 4)   // 増減量。入庫は正、出庫は負
-  reason      StockTransactionReason
-  notes       String?
+  id         Int                    @id @default(autoincrement())
+  materialId Int
+  material   Material               @relation(fields: [materialId], references: [id])
+  occurredAt DateTime               @db.Date
+  qty        Decimal                @db.Decimal(14, 4) // 増減量。入庫は正、出庫は負
+  reason     StockTransactionReason
+  notes      String?
 
   // 起源となった伝票への参照（任意）
   purchaseOrderId      Int?
@@ -320,4 +356,292 @@ model StockTransaction {
 
   @@index([materialId, occurredAt])
   @@index([reason])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 自社製造所マスタ（取引先 Supplier とは別管理）
+// ─────────────────────────────────────────────────────────────
+
+model ManufacturingSite {
+  id           Int       @id @default(autoincrement())
+  name         String // 例: 株式会社すはだみらい研究所
+  address      String? // 所在地
+  permitDate   DateTime? @db.Date // 許可年月日
+  permitNumber String? // 許可番号
+
+  processes QualityStandardProcess[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────
+// 効能効果マスタ（化粧品の効能の範囲56項目）
+// ─────────────────────────────────────────────────────────────
+
+model EfficacyClaim {
+  id   Int    @id @default(autoincrement())
+  no   Int    @unique // 1〜56
+  text String // 例: 「皮膚にうるおいを与える。」
+
+  links QualityStandardEfficacy[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// 製品標準書 兼 品質標準書
+// ─────────────────────────────────────────────────────────────
+
+model QualityStandard {
+  id        Int     @id @default(autoincrement())
+  productId Int     @unique
+  product   Product @relation(fields: [productId], references: [id])
+
+  controlNumber String    @unique // 管理番号 例: "002-BC"
+  establishedAt DateTime? @db.Date // 制定日
+  establishedBy String? // 制定者
+
+  productCategory  String? // 製品の種類（化粧品/医薬部外品/雑貨 等）
+  manufacturer     String? // 製造販売業者
+  manufacturerAddr String? // 製造販売業者住所
+  permitDate       DateTime? @db.Date // 許可年月日
+  permitNumber     String? // 許可番号
+  notificationType String? // 届出（化粧品製造販売届出 等）
+
+  // 包装及び表示内容（1-to-1 で QualityStandard に保持）
+  pkgCapacity            String? // 内容量
+  pkgColorCode           String? // 色番・記号等
+  pkgManufacturerContact String? // 製造販売業者問合せ先
+  pkgDistributorContact  String? // 発売元
+  pkgAllIngredients      String? // 全成分
+  pkgUsageMethod         String? // 用法及び容量
+  pkgUsageNotes          String? // 使用上の注意
+  pkgIdentification      String? // 識別表示
+  pkgOther               String? // その他
+  pkgNotes               String? // 備考
+
+  // 製品化規格（1-to-1）
+  spFillVolume    String? // 充填量
+  spLotPrinter    String? // ロット印字機
+  spLotText       String? // 印字文字
+  spCardboardSize String? // 段ボール
+
+  notes String?
+
+  revisions   QualityStandardRevision[]
+  ingredients QualityStandardIngredient[]
+  methodSteps QualityStandardMethodStep[]
+  processes   QualityStandardProcess[]
+  testSpecs   QualityStandardTestSpec[]
+  workNotes   QualityStandardWorkNote[]
+  efficacies  QualityStandardEfficacy[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model QualityStandardRevision {
+  id                Int             @id @default(autoincrement())
+  qualityStandardId Int
+  qualityStandard   QualityStandard @relation(fields: [qualityStandardId], references: [id], onDelete: Cascade)
+  revisionNumber    String // 例: "01"
+  revisedAt         DateTime?       @db.Date // 改訂年月日
+  reason            String? // 改訂理由
+  changes           String? // 改訂事項
+  revisedBy         String? // 改訂者
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([qualityStandardId])
+}
+
+// 成分及び配合量
+model QualityStandardIngredient {
+  id                Int             @id @default(autoincrement())
+  qualityStandardId Int
+  qualityStandard   QualityStandard @relation(fields: [qualityStandardId], references: [id], onDelete: Cascade)
+  no                Int // 行番号
+  rawMaterialName   String? // 原料名
+  amountPercent     Decimal?        @db.Decimal(8, 4) // 配合量(%)
+  componentName     String? // 成分名
+  complexPercent    Decimal?        @db.Decimal(8, 4) // 複合原料配合(%)
+  spec              String? // 規格
+  portion           Decimal?        @db.Decimal(8, 4) // 分量(%)
+  rank              Int? // 配合量順位
+
+  @@index([qualityStandardId])
+}
+
+// 製造方法（手順）
+model QualityStandardMethodStep {
+  id                Int             @id @default(autoincrement())
+  qualityStandardId Int
+  qualityStandard   QualityStandard @relation(fields: [qualityStandardId], references: [id], onDelete: Cascade)
+  stepNo            Int
+  description       String
+
+  @@index([qualityStandardId])
+}
+
+// 製造所の情報及び製造工程
+model QualityStandardProcess {
+  id                  Int                @id @default(autoincrement())
+  qualityStandardId   Int
+  qualityStandard     QualityStandard    @relation(fields: [qualityStandardId], references: [id], onDelete: Cascade)
+  manufacturingSiteId Int?
+  manufacturingSite   ManufacturingSite? @relation(fields: [manufacturingSiteId], references: [id])
+  process             String? // 製造工程（例: 秤量、溶解、乳化、…）
+  sortOrder           Int                @default(0)
+
+  @@index([qualityStandardId])
+}
+
+// 規格及び試験方法（試験項目の規格定義）
+model QualityStandardTestSpec {
+  id                Int             @id @default(autoincrement())
+  qualityStandardId Int
+  qualityStandard   QualityStandard @relation(fields: [qualityStandardId], references: [id], onDelete: Cascade)
+  testItem          String // 試験項目
+  spec              String? // 規格
+  method            String? // 試験法
+  frequency         String? // 試験頻度
+  sortOrder         Int             @default(0)
+
+  @@index([qualityStandardId])
+}
+
+// 作業上の注意点
+model QualityStandardWorkNote {
+  id                Int             @id @default(autoincrement())
+  qualityStandardId Int
+  qualityStandard   QualityStandard @relation(fields: [qualityStandardId], references: [id], onDelete: Cascade)
+  workName          String // 作業名
+  content           String? // 内容
+  photoUrl          String? // 写真URL（後日アップロード対応）
+  sortOrder         Int             @default(0)
+
+  @@index([qualityStandardId])
+}
+
+// 品質標準書と効能効果の中間表
+model QualityStandardEfficacy {
+  qualityStandardId Int
+  qualityStandard   QualityStandard @relation(fields: [qualityStandardId], references: [id], onDelete: Cascade)
+  efficacyClaimId   Int
+  efficacyClaim     EfficacyClaim   @relation(fields: [efficacyClaimId], references: [id])
+
+  @@id([qualityStandardId, efficacyClaimId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 出荷可否決定通知（様式1-1）
+// ─────────────────────────────────────────────────────────────
+//
+// 1つの ManufacturingOrder に対して通常1件だが、再判定もあり得るので 1-to-N。
+model ShipmentDecision {
+  id                   Int                @id @default(autoincrement())
+  manufacturingOrderId Int
+  manufacturingOrder   ManufacturingOrder @relation(fields: [manufacturingOrderId], references: [id])
+
+  // 確認事項（5項目）
+  check1ManufacturerDecisionRecord ApprovalState? // 製造所からの出荷可否の決定の記録
+  check2TestReport                 SuitabilityState? // 当該製品の試験検査成績書
+  check3ProductQualityInfo         ExistenceState? // 当該製品の品質及び安全性に関する情報（有なら specialNotes に詳細）
+  check4MaterialQualityInfo        ExistenceState? // 原材料等の品質及び安全性に関する情報（有なら specialNotes に詳細）
+  check5DeviationCheck             ApprovalState? // 出荷判定基準逸脱等の有無と措置の確認（有なら 措置 適正/不適正）
+
+  specialNotes String? // 特記事項
+
+  // 決定
+  decision  ShipmentDecisionStatus
+  decidedAt DateTime?              @db.Date
+  decidedBy String? // 決定者（例: 「品質保証責任者 髙橋 亜紀子」）
+
+  shipments Shipment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([manufacturingOrderId])
+  @@index([decidedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 市場への出荷記録（様式1-2）
+// ─────────────────────────────────────────────────────────────
+//
+// 1つの ManufacturingOrder に対し、出荷先・回数ごとに複数行存在。
+model Shipment {
+  id                   Int                @id @default(autoincrement())
+  manufacturingOrderId Int
+  manufacturingOrder   ManufacturingOrder @relation(fields: [manufacturingOrderId], references: [id])
+  shipmentDecisionId   Int?
+  shipmentDecision     ShipmentDecision?  @relation(fields: [shipmentDecisionId], references: [id])
+
+  decisionDate   DateTime?               @db.Date // 出荷可否決定年月日
+  decision       ShipmentDecisionStatus? // 出荷の可否
+  shippedAt      DateTime?               @db.Date // 出荷年月日
+  destination    String? // 出荷先
+  shippedQty     Decimal?                @db.Decimal(14, 4)
+  remainingStock Decimal?                @db.Decimal(14, 4) // 在庫数量
+  notes          String?
+
+  // 製造販売業者確認欄
+  confirmedAt  DateTime? @db.Date
+  confirmedBy  String? // 品質保証責任者氏名
+  specialNotes String? // 特記事項（複数行を1つの Shipment に記載することは少ないので、別途集計で扱う想定）
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([manufacturingOrderId])
+  @@index([shippedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 試験検査記録
+// ─────────────────────────────────────────────────────────────
+model TestInspectionRecord {
+  id                   Int                @id @default(autoincrement())
+  manufacturingOrderId Int
+  manufacturingOrder   ManufacturingOrder @relation(fields: [manufacturingOrderId], references: [id])
+
+  testDate    DateTime? @db.Date // 試験年月日
+  testedBy    String? // 試験者
+  temperature Decimal?  @db.Decimal(5, 2) // 室温（℃）
+  humidity    Decimal?  @db.Decimal(5, 2) // 湿度（%）
+
+  overallResult   TestJudgment? // 総合判定
+  judgedBy        String? // 判定者
+  chiefTechnician String? // 責任技術者
+  qaResponsible   String? // 品質保証責任者
+  confirmedAt     DateTime?     @db.Date // 確認年月日
+
+  // 簡易版（試験検査記録 (2)）対応:
+  // 試験項目を持たず「製造メーカーの試験成績書に準ずる」のみ記載する場合に true
+  isSimplified   Boolean @default(false)
+  simplifiedNote String?
+
+  notes String?
+
+  items TestInspectionItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([manufacturingOrderId])
+}
+
+// 試験検査記録の試験項目行
+model TestInspectionItem {
+  id                     Int                  @id @default(autoincrement())
+  testInspectionRecordId Int
+  testInspectionRecord   TestInspectionRecord @relation(fields: [testInspectionRecordId], references: [id], onDelete: Cascade)
+  testItem               String // 試験項目（例: 外観 / pH / 一般細菌数 / 原料規格検査表）
+  spec                   String? // 規格（QualityStandardTestSpec.spec を初期値にコピー想定）
+  result                 String? // 試験結果
+  judgment               TestJudgment? // 適/否
+  sortOrder              Int                  @default(0)
+
+  @@index([testInspectionRecordId])
 }

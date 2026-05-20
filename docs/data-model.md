@@ -3,6 +3,8 @@
 参考:
 - 既存スプレッドシート（在庫・BOM・カテゴリ・取引先・製造記録の5シート）
 - 製造記録の印刷フォーマット（製品標準書 ロット記録用紙）
+- 出荷関連3様式（出荷可否決定通知 / 市場への出荷記録 / 試験検査記録）
+- 製品標準書 兼 品質標準書（11セクション）
 
 ## エンティティ関係図（概念）
 
@@ -255,6 +257,42 @@ adjust = 棚卸の実数 - 現在の stockQty
 StockTransaction(reason=INVENTORY_ADJUST, qty=adjust)
 ```
 
+## 出荷関連・品質標準書のテーブル群
+
+詳細はそれぞれ:
+- [docs/shipping-forms.md](shipping-forms.md) — 出荷可否決定通知 / 市場への出荷記録 / 試験検査記録
+- [docs/quality-standard.md](quality-standard.md) — 製品標準書 兼 品質標準書
+
+### 概要
+
+| モデル | 役割 |
+|--------|------|
+| `ManufacturingSite` | 自社グループの製造所マスタ（取引先 `Supplier` とは別管理） |
+| `EfficacyClaim` | 化粧品の効能の範囲 56項目のマスタ |
+| `QualityStandard` | 製品1つに対する品質標準書本体 + 包装/製品化規格を1-to-1で保持 |
+| `QualityStandardRevision` | 改訂履歴 |
+| `QualityStandardIngredient` | 成分及び配合量（行） |
+| `QualityStandardMethodStep` | 製造方法（手順） |
+| `QualityStandardProcess` | 製造所の情報及び製造工程（行） |
+| `QualityStandardTestSpec` | 規格及び試験方法（試験項目の定義） |
+| `QualityStandardWorkNote` | 作業上の注意点 |
+| `QualityStandardEfficacy` | 効能効果との中間表 |
+| `ShipmentDecision` | 出荷可否決定通知（様式1-1） |
+| `Shipment` | 市場への出荷記録（様式1-2） |
+| `TestInspectionRecord` | 試験検査記録 |
+| `TestInspectionItem` | 試験検査記録の試験項目行 |
+
+### 関連
+
+```
+Product ─1:1→ QualityStandard
+ManufacturingOrder ─1:N→ ShipmentDecision ─1:N→ Shipment
+ManufacturingOrder ─1:N→ Shipment（決定を経ない出荷記録の追加にも対応）
+ManufacturingOrder ─1:N→ TestInspectionRecord ─1:N→ TestInspectionItem
+QualityStandard ─N:M→ EfficacyClaim
+QualityStandard.processes ─→ ManufacturingSite
+```
+
 ## 設計上の判断ポイント（解消済み）
 
 - ✅ 関連資材[アロマ協会/てんまん] → **削除**
@@ -264,3 +302,5 @@ StockTransaction(reason=INVENTORY_ADJUST, qty=adjust)
 - ✅ 預かり在庫の3列 → **`consignedQty` + `consignedOwner` の2列に統合**
 - ✅ 在庫数量（理論値）の「理論値」表記 → **削除**
 - ✅ 製造記録の印刷フォーマット対応 → **ManufacturingOrder に印刷項目追加 + 2つの子テーブル**
+- ✅ 出荷可否決定通知 / 市場への出荷記録 / 試験検査記録 → **3つの帳票用モデルを追加（[docs/shipping-forms.md](shipping-forms.md)）**
+- ✅ 製品標準書 兼 品質標準書 → **`QualityStandard` + 子テーブル群、`ManufacturingSite` / `EfficacyClaim` マスタを追加（[docs/quality-standard.md](quality-standard.md)）**

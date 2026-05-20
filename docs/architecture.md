@@ -51,11 +51,16 @@
 
 | ページ | 機能 |
 |--------|------|
-| `/manufacturing-orders` | 製造指示一覧・新規作成・編集・削除。製品名・数量・指示日（≒受注日）・製造予定日・ロット番号 |
+| `/manufacturing-orders` | 製造指示一覧・新規作成・編集・削除 |
 | `/manufacturing-orders/[id]` | 詳細。BOMから必要資材一覧を自動算出し、在庫との差分を表示 |
-| `/manufacturing-orders/[id]/print` | 製造記録の印刷用ビュー（製品標準書 ロット記録用紙の様式） → 詳細は [docs/print-template.md](print-template.md) |
-| `/purchase-orders` | 資材発注一覧。資材名・発注先・発注日・数量・状況（未発注/発注済/到着済）・到着見込日 |
+| `/manufacturing-orders/[id]/print` | 製造記録（ロット記録用紙） → [docs/print-template.md](print-template.md) |
+| `/manufacturing-orders/[id]/shipment-decisions/[sid]/print` | 出荷可否決定通知（様式1-1） |
+| `/manufacturing-orders/[id]/shipments/print` | 市場への出荷記録（様式1-2） |
+| `/manufacturing-orders/[id]/test-inspections/[tid]/print` | 試験検査記録 |
+| `/purchase-orders` | 資材発注一覧 |
 | `/` | ダッシュボード。製造予定・発注予定・在庫不足アラート |
+
+出荷関連3帳票の詳細は [docs/shipping-forms.md](shipping-forms.md)。
 
 ### フェーズ2 — マスタ管理
 
@@ -64,8 +69,13 @@
 | `/materials` | 資材・原料マスタ。在庫数量、棚卸日入力 |
 | `/products` | 製品マスタ。配合（BOM）の編集 |
 | `/products/[id]/recipe` | 配合エディタ。原料・資材と利用量の組み合わせ |
+| `/products/[id]/quality-standard` | 製品標準書 兼 品質標準書の編集 → [docs/quality-standard.md](quality-standard.md) |
+| `/products/[id]/quality-standard/print` | 品質標準書11セクションの印刷ビュー |
+| `/quality-standards` | 品質標準書の一覧（管理番号・制定日・改訂数・充足率） |
+| `/manufacturing-sites` | 自社製造所マスタ |
 | `/suppliers` | 取引先マスタ |
 | `/categories` | カテゴリマスタ |
+| `/efficacy-claims` | 効能効果マスタ（56項目、参照のみ。シードで投入） |
 | `/import` | スプレッドシートのCSVを各テーブルに取り込む |
 
 ### フェーズ3 — 実績・分析
@@ -78,7 +88,7 @@
 
 ## CSVインポート設計
 
-スプレッドシートの5シートに対応する5つのインポーターを用意します。
+製造管理スプレッドシートの5シートに対応する5つのインポーターを用意します。
 
 | シート | 取り込み先テーブル | 備考 |
 |--------|---------------------|------|
