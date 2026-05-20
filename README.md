@@ -29,4 +29,4 @@
 - Prisma + PostgreSQL (Vercel Postgres)
 - Tailwind CSS
 - Vercel デプロイ
-- 認証なし（社内のみ運用）
+- 認証: 共有パスワード/PINによるサイト全体保護（社内運用）

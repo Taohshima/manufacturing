@@ -11,7 +11,7 @@
 | UI | shadcn/ui + lucide-react | テーブル多めなので軽量UIで |
 | 入出力 | CSVインポート/エクスポート | `papaparse` 等を利用 |
 | デプロイ | Vercel | プレビュー環境＋本番 |
-| 認証 | なし | 社内限定URLで運用 |
+| 認証 | 共有パスワード/PIN | 詳細は[認証セクション](#認証パスワードpin)参照 |
 
 ## ディレクトリ構成（予定）
 
@@ -22,9 +22,12 @@
 │   ├── migrations/           # マイグレーション履歴
 │   └── seed.ts               # シードスクリプト（カテゴリマスタ等）
 ├── src/
+│   ├── middleware.ts                      # 認証チェック（未認証は /login へ）
 │   ├── app/
 │   │   ├── layout.tsx
 │   │   ├── page.tsx                       # ダッシュボード
+│   │   ├── login/                         # ログイン画面（パスワード/PIN）
+│   │   ├── logout/                        # ログアウト
 │   │   ├── manufacturing-orders/          # 製造指示
 │   │   ├── purchase-orders/               # 資材発注
 │   │   ├── materials/                     # 資材・原料マスタ
@@ -34,6 +37,7 @@
 │   │   └── import/                        # CSVインポート画面
 │   ├── lib/
 │   │   ├── prisma.ts                      # PrismaClientシングルトン
+│   │   ├── auth.ts                        # パスワード検証・セッションCookie
 │   │   ├── csv.ts                         # CSVパース/出力
 │   │   └── bom.ts                         # 配合から必要資材を計算
 │   └── components/
@@ -85,6 +89,57 @@
 | 製造実績ダッシュボード | 月次製造量、ロット別 |
 | 在庫推移 | 棚卸履歴のグラフ |
 | 原価分析 | 製品ごとの原料費＋資材費の集計 |
+
+## 認証（パスワード/PIN）
+
+会社の最重要情報を扱うため、サイト全体に認証を必須とする。
+ユーザー単位の管理ではなく、**1つの共有パスワード/PIN** で運用する。
+
+### 方式
+
+| 項目 | 内容 |
+|------|------|
+| 認証情報 | 環境変数 `APP_PASSWORD`（または `APP_PIN`）に **bcrypt等でハッシュ化した値** を保存 |
+| ログイン画面 | `/login`。パスワード/PINを入力するシンプルなフォーム |
+| セッション | サーバー側で署名（HMAC-SHA256）したCookieを発行。`HttpOnly`, `Secure`, `SameSite=Lax`, 有効期限7日（環境変数で変更可） |
+| アクセス制御 | Next.js Middleware (`src/middleware.ts`) で `/login` と静的アセット以外を全て保護 |
+| ログアウト | ヘッダーから `/logout` を呼び、Cookieを削除して `/login` へリダイレクト |
+| レート制限 | 同一IPからの連続失敗を5回でロック（メモリベース、シンプル実装） |
+
+### ファイル構成（予定）
+
+```
+src/
+├── middleware.ts                # Cookie検証、未認証は /login へ
+├── lib/
+│   └── auth.ts                  # bcrypt verify、署名Cookie発行/検証
+└── app/
+    ├── login/
+    │   ├── page.tsx             # ログインフォーム
+    │   └── actions.ts           # Server Action: verify password → Cookie発行
+    └── logout/
+        └── route.ts             # GET /logout → Cookie削除
+```
+
+### 環境変数
+
+| 変数 | 必須 | 説明 |
+|------|------|------|
+| `APP_PASSWORD_HASH` | ✓ | bcryptハッシュ。生成例: `node -e "console.log(require('bcryptjs').hashSync('your-password', 12))"` |
+| `SESSION_SECRET` | ✓ | Cookie署名キー（32文字以上の乱数） |
+| `SESSION_MAX_AGE_DAYS` | | デフォルト 7 |
+
+ローカル開発用に `.env.example` を用意し、平文の `APP_PASSWORD` から起動時にハッシュ生成するヘルパースクリプトも添える。
+
+### Vercel運用時の注意
+
+- パスワードは**プロジェクト設定の Environment Variables** にハッシュ値を保存（平文を絶対にコミットしない）
+- ロックアウト状態はインスタンスメモリベース。Vercelはサーバーレスでインスタンスが分散するため厳密な防御にはならない → 必要なら後日 Redis ベースに置き換え
+
+### 将来拡張
+
+- ユーザー単位の認証が必要になったら `User` テーブルを追加して NextAuth.js 等に切り替え
+- 操作ログ（誰がいつ何を変更したか）は v1では取らない。将来 `AuditLog` を追加可能
 
 ## CSVインポート設計
 
