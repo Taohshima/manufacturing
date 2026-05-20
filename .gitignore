@@ -9,3 +9,5 @@ out/
 *.log
 .idea/
 .vscode/
+next-env.d.ts
+tsconfig.tsbuildinfo
