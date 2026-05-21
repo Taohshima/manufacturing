@@ -48,7 +48,10 @@ export type CommitResult = {
 };
 
 const normalizeHeader = (s: string): string =>
-  s.replace(/\s+/g, "").replace(/[（）()]/g, "").toLowerCase();
+  s
+    .replace(/[（(][^）)]*[）)]/g, "") // 括弧書きの注釈を丸ごと除去
+    .replace(/\s+/g, "")
+    .toLowerCase();
 
 export function detectMapping<T extends string>(
   headers: string[],

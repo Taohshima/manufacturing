@@ -46,25 +46,59 @@ const STRING_FIELDS: SupplierField[] = [
   "alias",
 ];
 
-function normalizeRow(input: SupplierInputRow) {
+type SupplierData = {
+  companyName: string;
+  officeName: string | null;
+  postalCode: string | null;
+  address: string | null;
+  phone: string | null;
+  fax: string | null;
+  websiteUrl: string | null;
+  contactPerson: string | null;
+  email: string | null;
+  orderMethod: string | null;
+  paymentMethod: string | null;
+  paymentDay: number | null;
+  paymentDivision: string | null;
+  paymentSite: string | null;
+  searchLabel: string | null;
+  alias: string | null;
+};
+
+function normalizeRow(input: SupplierInputRow): SupplierData {
   const data: Record<string, string | number | null> = {};
   for (const f of STRING_FIELDS) {
     const v = input[f];
     data[f] = v == null || v === "" ? null : v;
   }
   data.paymentDay = parseIntSafe(input.paymentDay ?? null);
-  return data;
+  data.companyName = (input.companyName ?? "").trim();
+  return data as SupplierData;
 }
 
-function diffChanged(
-  current: Record<string, unknown>,
-  incoming: Record<string, unknown>,
-): boolean {
-  for (const key of Object.keys(incoming)) {
-    const a = current[key];
-    const b = incoming[key];
-    if (a == null && b == null) continue;
-    if (String(a ?? "") !== String(b ?? "")) return true;
+function pickSupplierData(
+  row: Record<string, unknown> & { companyName: string },
+): SupplierData {
+  const out: Record<string, string | number | null> = {};
+  for (const f of STRING_FIELDS) {
+    const v = row[f];
+    out[f] =
+      v == null || v === "" ? null : typeof v === "string" ? v : String(v);
+  }
+  const pd = row.paymentDay;
+  out.paymentDay =
+    typeof pd === "number" ? pd : pd == null ? null : parseIntSafe(String(pd));
+  return out as SupplierData;
+}
+
+function diffChanged(current: SupplierData, incoming: SupplierData): boolean {
+  for (const f of STRING_FIELDS) {
+    const a = current[f] ?? null;
+    const b = incoming[f] ?? null;
+    if (a !== b) return true;
+  }
+  if ((current.paymentDay ?? null) !== (incoming.paymentDay ?? null)) {
+    return true;
   }
   return false;
 }
@@ -78,10 +112,31 @@ export async function dryRunSuppliers(
   let unchangedCount = 0;
   let errorCount = 0;
 
+  // 既存レコードを companyName 順に一括取得しておく
+  const incomingNames = Array.from(
+    new Set(
+      rows
+        .map((r) => (r.companyName ?? "").trim())
+        .filter((s) => s.length > 0),
+    ),
+  );
+  const existingRecords = await prisma.supplier.findMany({
+    where: { companyName: { in: incomingNames } },
+  });
+  const existingMap = new Map<string, SupplierData>();
+  for (const e of existingRecords) {
+    existingMap.set(
+      e.companyName,
+      pickSupplierData(e as unknown as Record<string, unknown> & {
+        companyName: string;
+      }),
+    );
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const rowIndex = i + 1;
-    const r = rows[i];
-    const companyName = (r.companyName ?? "").trim();
+    const incoming = normalizeRow(rows[i]);
+    const companyName = incoming.companyName;
 
     if (!companyName) {
       result.push({
@@ -89,35 +144,28 @@ export async function dryRunSuppliers(
         status: "error",
         key: "",
         message: "取引先会社名が空です",
-        incoming: r,
+        incoming: incoming as unknown as Record<string, unknown>,
       });
       errorCount++;
       continue;
     }
 
-    const incoming = normalizeRow(r);
-    const current = await prisma.supplier.findFirst({
-      where: { companyName },
-    });
-
+    const current = existingMap.get(companyName);
     if (!current) {
       result.push({
         rowIndex,
         status: "new",
         key: companyName,
-        incoming,
+        incoming: incoming as unknown as Record<string, unknown>,
       });
       newCount++;
     } else {
-      const changed = diffChanged(
-        current as unknown as Record<string, unknown>,
-        incoming,
-      );
+      const changed = diffChanged(current, incoming);
       result.push({
         rowIndex,
         status: changed ? "update" : "unchanged",
         key: companyName,
-        incoming,
+        incoming: incoming as unknown as Record<string, unknown>,
         current: current as unknown as Record<string, unknown>,
       });
       if (changed) updateCount++;
@@ -143,39 +191,54 @@ export async function commitSuppliers(
   let skipped = 0;
   const errors: { rowIndex: number; message: string }[] = [];
 
+  // 既存レコードを一括取得
+  const incomingNames = Array.from(
+    new Set(
+      rows
+        .map((r) => (r.companyName ?? "").trim())
+        .filter((s) => s.length > 0),
+    ),
+  );
+  const existingRecords = await prisma.supplier.findMany({
+    where: { companyName: { in: incomingNames } },
+  });
+  const existingMap = new Map<
+    string,
+    { id: number; data: SupplierData }
+  >();
+  for (const e of existingRecords) {
+    existingMap.set(e.companyName, {
+      id: e.id,
+      data: pickSupplierData(
+        e as unknown as Record<string, unknown> & { companyName: string },
+      ),
+    });
+  }
+
   for (let i = 0; i < rows.length; i++) {
     const rowIndex = i + 1;
-    const r = rows[i];
-    const companyName = (r.companyName ?? "").trim();
+    const incoming = normalizeRow(rows[i]);
+    const companyName = incoming.companyName;
     if (!companyName) {
       errors.push({ rowIndex, message: "取引先会社名が空です" });
       continue;
     }
 
     try {
-      const incoming = normalizeRow(r);
-      const existing = await prisma.supplier.findFirst({
-        where: { companyName },
-      });
+      const existing = existingMap.get(companyName);
       if (!existing) {
-        await prisma.supplier.create({
-          data: { ...incoming, companyName } as never,
-        });
+        await prisma.supplier.create({ data: incoming });
         created++;
+      } else if (diffChanged(existing.data, incoming)) {
+        const { companyName: _omit, ...rest } = incoming;
+        void _omit;
+        await prisma.supplier.update({
+          where: { id: existing.id },
+          data: rest,
+        });
+        updated++;
       } else {
-        const changed = diffChanged(
-          existing as unknown as Record<string, unknown>,
-          incoming,
-        );
-        if (changed) {
-          await prisma.supplier.update({
-            where: { id: existing.id },
-            data: incoming as never,
-          });
-          updated++;
-        } else {
-          skipped++;
-        }
+        skipped++;
       }
     } catch (e) {
       errors.push({

@@ -30,10 +30,16 @@ const COLUMNS: ColumnDefinition<SupplierField>[] = [
   { field: "postalCode", jpHeaders: ["郵便番号", "〒"] },
   { field: "address", jpHeaders: ["住所", "所在地"] },
   { field: "phone", jpHeaders: ["電話", "電話番号", "TEL"] },
-  { field: "fax", jpHeaders: ["FAX", "ファックス", "ファクス"] },
-  { field: "websiteUrl", jpHeaders: ["URL", "WebサイトURL", "ホームページ"] },
+  { field: "fax", jpHeaders: ["FAX", "FAX番号", "ファックス", "ファクス"] },
+  {
+    field: "websiteUrl",
+    jpHeaders: ["URL", "会社URL", "WebサイトURL", "ホームページ"],
+  },
   { field: "contactPerson", jpHeaders: ["発注先担当者", "担当者"] },
-  { field: "email", jpHeaders: ["メール", "メールアドレス", "Email"] },
+  {
+    field: "email",
+    jpHeaders: ["メール", "メールアドレス", "発注先メールアドレス", "Email"],
+  },
   { field: "orderMethod", jpHeaders: ["発注方法"] },
   { field: "paymentMethod", jpHeaders: ["支払方法"] },
   { field: "paymentDay", jpHeaders: ["支払日"], type: "number" },
@@ -42,7 +48,10 @@ const COLUMNS: ColumnDefinition<SupplierField>[] = [
     jpHeaders: ["支払区分", "現金/クレジット", "現金クレジット"],
   },
   { field: "paymentSite", jpHeaders: ["支払サイト", "当月/翌月"] },
-  { field: "searchLabel", jpHeaders: ["検索ラベル"] },
+  {
+    field: "searchLabel",
+    jpHeaders: ["検索ラベル", "発注先検索ラベル"],
+  },
   { field: "alias", jpHeaders: ["呼称", "別名"] },
 ];
 
