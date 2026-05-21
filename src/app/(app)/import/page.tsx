@@ -17,8 +17,8 @@ const IMPORTERS: Importer[] = [
   {
     href: "/import/materials",
     title: "資材・原料在庫マスタ",
-    description: "資材名で突合。カテゴリ・発注先を紐付け。",
-    status: "wip",
+    description: "名称＋区分で突合。カテゴリ・発注先を紐付け。初期在庫はStockTransactionで反映。",
+    status: "ready",
   },
   {
     href: "/import/products",
