@@ -26,6 +26,7 @@ export type DryRunRow = {
   status: DryRunRowStatus;
   key: string; // 識別用（例: companyName）
   message?: string; // エラー時のメッセージ
+  warning?: string; // 取込は継続するが注意が必要な場合のメッセージ
   incoming: Record<string, unknown>;
   current?: Record<string, unknown>;
 };
@@ -36,6 +37,7 @@ export type DryRunResult = {
   updateCount: number;
   unchangedCount: number;
   errorCount: number;
+  warningCount?: number;
   rows: DryRunRow[];
 };
 

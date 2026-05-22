@@ -261,6 +261,9 @@ export function CsvImporter<T extends string>({
             <Stat label="新規" value={dryRun.newCount} color="emerald" />
             <Stat label="更新" value={dryRun.updateCount} color="amber" />
             <Stat label="変更なし" value={dryRun.unchangedCount} color="slate" />
+            {dryRun.warningCount ? (
+              <Stat label="警告" value={dryRun.warningCount} color="amber" />
+            ) : null}
             <Stat label="エラー" value={dryRun.errorCount} color="red" />
           </div>
 
@@ -294,8 +297,14 @@ export function CsvImporter<T extends string>({
                     <td className="border-b border-slate-100 px-2 py-1">
                       {r.key}
                     </td>
-                    <td className="border-b border-slate-100 px-2 py-1 text-red-700">
-                      {r.message ?? ""}
+                    <td className="border-b border-slate-100 px-2 py-1">
+                      {r.message ? (
+                        <span className="text-red-700">{r.message}</span>
+                      ) : r.warning ? (
+                        <span className="text-amber-700">{r.warning}</span>
+                      ) : (
+                        ""
+                      )}
                     </td>
                   </tr>
                 ))}

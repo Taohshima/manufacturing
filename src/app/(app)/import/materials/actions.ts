@@ -68,29 +68,73 @@ type NormalizedMaterial = {
 
 type LookupContext = {
   categoryMap: Map<string, { id: number }>; // key: `${division}|${name}`
-  supplierMap: Map<string, { id: number }>; // key: companyName
+  supplierExact: Map<string, { id: number }>; // key: companyName / alias / searchLabel
+  supplierNormalized: Map<string, { id: number }>; // key: 正規化済み社名
 };
+
+// 「株式会社」「（株）」「有限会社」「合同会社」やスペース・記号を除いて正規化する
+function normalizeCompany(s: string): string {
+  return s
+    .replace(/株式会社|有限会社|合同会社|合資会社|合名会社/g, "")
+    .replace(/[（(]株[）)]|[（(]有[）)]|㈱|㈲/g, "")
+    .replace(/[\s　・,，.．/／-]/g, "")
+    .toLowerCase();
+}
 
 async function buildContext(): Promise<LookupContext> {
   const [cats, sups] = await Promise.all([
     prisma.category.findMany(),
-    prisma.supplier.findMany({ select: { id: true, companyName: true } }),
+    prisma.supplier.findMany({
+      select: {
+        id: true,
+        companyName: true,
+        alias: true,
+        searchLabel: true,
+      },
+    }),
   ]);
   const categoryMap = new Map<string, { id: number }>();
   for (const c of cats) {
     categoryMap.set(`${c.division}|${c.name}`, { id: c.id });
   }
-  const supplierMap = new Map<string, { id: number }>();
+  const supplierExact = new Map<string, { id: number }>();
+  const supplierNormalized = new Map<string, { id: number }>();
   for (const s of sups) {
-    supplierMap.set(s.companyName, { id: s.id });
+    const ref = { id: s.id };
+    supplierExact.set(s.companyName, ref);
+    if (s.alias) supplierExact.set(s.alias, ref);
+    if (s.searchLabel) supplierExact.set(s.searchLabel, ref);
+    // 正規化キー（最初に登録した社名を優先）
+    const nk = normalizeCompany(s.companyName);
+    if (nk && !supplierNormalized.has(nk)) supplierNormalized.set(nk, ref);
+    if (s.alias) {
+      const ak = normalizeCompany(s.alias);
+      if (ak && !supplierNormalized.has(ak)) supplierNormalized.set(ak, ref);
+    }
   }
-  return { categoryMap, supplierMap };
+  return { categoryMap, supplierExact, supplierNormalized };
+}
+
+function resolveSupplier(
+  name: string,
+  ctx: LookupContext,
+): { id: number } | null {
+  const exact = ctx.supplierExact.get(name);
+  if (exact) return exact;
+  const nk = normalizeCompany(name);
+  if (nk) {
+    const norm = ctx.supplierNormalized.get(nk);
+    if (norm) return norm;
+  }
+  return null;
 }
 
 function normalizeRow(
   input: MaterialInputRow,
   ctx: LookupContext,
-): { ok: true; data: NormalizedMaterial } | { ok: false; message: string } {
+):
+  | { ok: true; data: NormalizedMaterial; warning?: string }
+  | { ok: false; message: string } {
   const name = (input.name ?? "").trim();
   if (!name) return { ok: false, message: "名称が空です" };
 
@@ -117,21 +161,21 @@ function normalizeRow(
 
   let supplierId: number | null = null;
   let supplierName: string | null = null;
+  let warning: string | undefined;
   const sup = (input.supplierCompanyName ?? "").trim();
   if (sup) {
-    const found = ctx.supplierMap.get(sup);
-    if (!found) {
-      return {
-        ok: false,
-        message: `発注先「${sup}」が取引先マスタに存在しません（先に取引先を取込してください）`,
-      };
+    const found = resolveSupplier(sup, ctx);
+    if (found) {
+      supplierId = found.id;
+      supplierName = sup;
+    } else {
+      warning = `発注先「${sup}」が取引先マスタに無いため未紐付けで取込みます`;
     }
-    supplierId = found.id;
-    supplierName = sup;
   }
 
   return {
     ok: true,
+    warning,
     data: {
       name,
       division,
@@ -240,6 +284,7 @@ export async function dryRunMaterials(
   let updateCount = 0;
   let unchangedCount = 0;
   let errorCount = 0;
+  let warningCount = 0;
 
   const validated = rows.map((r) => normalizeRow(r, ctx));
   const keys = validated
@@ -262,6 +307,7 @@ export async function dryRunMaterials(
       continue;
     }
     const incoming = v.data;
+    if (v.warning) warningCount++;
     const k = `${incoming.division}|${incoming.name}`;
     const current = existingMap.get(k);
     const key = `${incoming.name}（${DIVISION_LABEL[incoming.division]}）`;
@@ -270,6 +316,7 @@ export async function dryRunMaterials(
         rowIndex,
         status: "new",
         key,
+        warning: v.warning,
         incoming: incoming as unknown as Record<string, unknown>,
       });
       newCount++;
@@ -283,6 +330,7 @@ export async function dryRunMaterials(
         rowIndex,
         status: changed ? "update" : "unchanged",
         key,
+        warning: v.warning,
         incoming: incoming as unknown as Record<string, unknown>,
         current: {
           stockQty: current.stockQty,
@@ -301,6 +349,7 @@ export async function dryRunMaterials(
     updateCount,
     unchangedCount,
     errorCount,
+    warningCount,
     rows: result,
   };
 }
