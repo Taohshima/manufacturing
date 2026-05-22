@@ -176,7 +176,14 @@ export default async function MaterialsPage({
                   <td className="whitespace-nowrap px-3 py-2 text-slate-600">
                     {m.category.name}
                   </td>
-                  <td className="px-3 py-2">{m.name}</td>
+                  <td className="px-3 py-2">
+                    <Link
+                      href={`/materials/${m.id}`}
+                      className="font-medium text-slate-900 hover:text-slate-600 hover:underline"
+                    >
+                      {m.name}
+                    </Link>
+                  </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                     {fmtQty(m.stockQty)}
                   </td>

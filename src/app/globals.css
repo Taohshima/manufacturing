@@ -11,6 +11,12 @@
   }
 }
 
+@layer components {
+  .input {
+    @apply w-full rounded border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none;
+  }
+}
+
 @media print {
   .no-print {
     display: none !important;
