@@ -317,7 +317,7 @@ export function CsvImporter<T extends string>({
               <button
                 type="button"
                 onClick={handleCommit}
-                disabled={busy || dryRun.errorCount > 0}
+                disabled={busy || dryRun.newCount + dryRun.updateCount === 0}
                 className="rounded bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy
@@ -325,8 +325,9 @@ export function CsvImporter<T extends string>({
                   : `${dryRun.newCount + dryRun.updateCount} 件を確定`}
               </button>
               {dryRun.errorCount > 0 ? (
-                <p className="mt-2 text-xs text-red-700">
-                  エラー行があります。CSVを修正してから再度アップロードしてください。
+                <p className="mt-2 text-xs text-amber-700">
+                  エラー {dryRun.errorCount}{" "}
+                  件はスキップして取込みます（CSVを修正して再アップロードすれば後から追加できます）。
                 </p>
               ) : null}
             </div>
