@@ -527,3 +527,107 @@ export async function populatePackagingFromBom(formData: FormData) {
   });
   packagingDone(manufacturingOrderId);
 }
+
+// ─────────────────────────────────────────────────────────────
+// 指図の配合(BOM)を製品マスタの最新BOMから再同期
+// PLANNED/IN_PROGRESSの指図のみ可。秤量実績(actualQty)や原料ロットがある行は
+// 削除対象になっても保持する（実績データ保護）。
+// ─────────────────────────────────────────────────────────────
+export async function syncBomFromProduct(formData: FormData) {
+  const id = Number(formData.get("id"));
+  if (!Number.isFinite(id)) throw new Error("invalid id");
+
+  const order = await prisma.manufacturingOrder.findUnique({
+    where: { id },
+    include: {
+      product: {
+        include: {
+          recipes: {
+            orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+            include: { material: true },
+          },
+        },
+      },
+      ingredients: true,
+    },
+  });
+  if (!order) {
+    redirect("/manufacturing-orders");
+  }
+
+  if (order!.status !== "PLANNED" && order!.status !== "IN_PROGRESS") {
+    redirect(
+      `/manufacturing-orders/${id}?error=${encodeURIComponent("完了・キャンセル済の指図は再同期できません")}`,
+    );
+  }
+
+  const plannedQtyN = Number(order!.plannedQty);
+  const recipeMap = new Map(order!.product.recipes.map((r) => [r.materialId, r]));
+  const ingredientMap = new Map(order!.ingredients.map((ing) => [ing.materialId, ing]));
+
+  let added = 0;
+  let updated = 0;
+  let unchanged = 0;
+  let removed = 0;
+  let skippedDelete = 0;
+
+  await prisma.$transaction(async (tx) => {
+    // 追加 or 更新
+    for (const r of order!.product.recipes) {
+      const ing = ingredientMap.get(r.materialId);
+      const newPlannedQty = (Number(r.usageQty) * plannedQtyN).toString();
+      if (!ing) {
+        await tx.manufacturingOrderIngredient.create({
+          data: {
+            manufacturingOrderId: id,
+            materialId: r.materialId,
+            perUnitQty: r.usageQty,
+            perUnitUnit: r.usageUnit,
+            plannedQty: newPlannedQty,
+            sortOrder: r.sortOrder,
+          },
+        });
+        added++;
+      } else {
+        const changed =
+          Number(ing.perUnitQty) !== Number(r.usageQty) ||
+          ing.perUnitUnit !== r.usageUnit ||
+          ing.sortOrder !== r.sortOrder ||
+          Number(ing.plannedQty) !== Number(newPlannedQty);
+        if (changed) {
+          await tx.manufacturingOrderIngredient.update({
+            where: { id: ing.id },
+            data: {
+              perUnitQty: r.usageQty,
+              perUnitUnit: r.usageUnit,
+              plannedQty: newPlannedQty,
+              sortOrder: r.sortOrder,
+            },
+          });
+          updated++;
+        } else {
+          unchanged++;
+        }
+      }
+    }
+
+    // 削除（BOMから消えた材料）。実績があるものは保持
+    for (const ing of order!.ingredients) {
+      if (recipeMap.has(ing.materialId)) continue;
+      const hasActual =
+        ing.actualQty != null || ing.materialLotNumber || ing.notes || ing.checked;
+      if (hasActual) {
+        skippedDelete++;
+      } else {
+        await tx.manufacturingOrderIngredient.delete({ where: { id: ing.id } });
+        removed++;
+      }
+    }
+  });
+
+  revalidatePath(`/manufacturing-orders/${id}`);
+  const msg = `BOM同期：追加 ${added} ／ 更新 ${updated} ／ 変更なし ${unchanged} ／ 削除 ${removed}${skippedDelete > 0 ? ` ／ 実績ありのため保持 ${skippedDelete}` : ""}`;
+  redirect(
+    `/manufacturing-orders/${id}?bomSyncMessage=${encodeURIComponent(msg)}`,
+  );
+}

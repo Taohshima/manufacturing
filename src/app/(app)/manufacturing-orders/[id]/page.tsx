@@ -26,6 +26,7 @@ import {
   updatePackaging,
   deletePackaging,
   populatePackagingFromBom,
+  syncBomFromProduct,
 } from "./actions";
 
 const APPROVAL_LABEL: Record<ApprovalState, string> = {
@@ -82,6 +83,7 @@ export default async function ManufacturingOrderDetailPage({
     created?: string;
     completed?: string;
     error?: string;
+    bomSyncMessage?: string;
   }>;
 }) {
   const { id: idStr } = await params;
@@ -204,6 +206,7 @@ export default async function ManufacturingOrderDetailPage({
         </Banner>
       ) : null}
       {sp.saved ? <Banner kind="ok">保存しました。</Banner> : null}
+      {sp.bomSyncMessage ? <Banner kind="ok">{sp.bomSyncMessage}</Banner> : null}
       {sp.error ? <Banner kind="err">{sp.error}</Banner> : null}
 
       {/* 基本情報・工程情報の編集 */}
@@ -491,11 +494,21 @@ export default async function ManufacturingOrderDetailPage({
 
       {/* 配合原料（秤量実績） */}
       <div className="space-y-2">
-        <h2 className="text-base font-semibold">
-          配合原料（{order.ingredients.length}品目）
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">
+            配合原料（{order.ingredients.length}品目）
+          </h2>
+          {editable ? (
+            <form action={syncBomFromProduct}>
+              <input type="hidden" name="id" value={order.id} />
+              <button className="rounded border border-emerald-300 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50">
+                製品BOMから再同期
+              </button>
+            </form>
+          ) : null}
+        </div>
         <p className="text-xs text-slate-500">
-          指図量は配合(BOM) × 製造数量で自動計算。秤量実績を入力していない場合、完了時には指図量を消費します。
+          指図量は配合(BOM) × 製造数量で自動計算。秤量実績を入力していない場合、完了時には指図量を消費します。製品BOMを変更した場合は「製品BOMから再同期」で追従できます（秤量実績がある行は保護されます）。
         </p>
 
         <div className="rounded-lg border border-slate-200 bg-white">
