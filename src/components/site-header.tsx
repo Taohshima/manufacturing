@@ -7,6 +7,7 @@ const navItems = [
   { href: "/materials", label: "資材・原料" },
   { href: "/stock-transactions", label: "入出庫履歴" },
   { href: "/trace", label: "ロットトレース" },
+  { href: "/reports", label: "月次レポート" },
   { href: "/products", label: "製品" },
   { href: "/quality-standards", label: "品質標準書" },
   { href: "/suppliers", label: "取引先" },
