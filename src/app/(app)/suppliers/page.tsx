@@ -53,6 +53,12 @@ export default async function SuppliersPage({
           >
             CSVで取込
           </Link>
+          <a
+            href={`/suppliers/export${q ? `?q=${encodeURIComponent(q)}` : ""}`}
+            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            CSVで出力
+          </a>
         </div>
       </div>
 

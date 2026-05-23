@@ -44,12 +44,32 @@ export default async function ProductsPage({
             登録 {total} 件{q ? `／ 絞り込み結果 ${products.length} 件` : null}
           </p>
         </div>
-        <Link
-          href="/products/new"
-          className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          新規登録
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/products/new"
+            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            新規登録
+          </Link>
+          <Link
+            href="/import/products"
+            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            CSVで取込
+          </Link>
+          <a
+            href={`/products/export${q ? `?q=${encodeURIComponent(q)}` : ""}`}
+            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            製品CSV
+          </a>
+          <a
+            href={`/products/export?mode=recipes${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            配合CSV
+          </a>
+        </div>
       </div>
 
       <form

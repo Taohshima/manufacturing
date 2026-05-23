@@ -93,6 +93,16 @@ export default async function MaterialsPage({
           >
             CSVで取込
           </Link>
+          <a
+            href={`/materials/export?${new URLSearchParams({
+              ...(q ? { q } : {}),
+              ...(division ? { division } : {}),
+              ...(categoryId ? { categoryId: String(categoryId) } : {}),
+            }).toString()}`}
+            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            CSVで出力
+          </a>
         </div>
       </div>
 
