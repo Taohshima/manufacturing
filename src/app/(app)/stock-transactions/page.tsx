@@ -121,13 +121,32 @@ export default async function StockTransactionsPage({
     else outTotal += n;
   }
 
+  // 現在の検索条件を維持してエクスポートURLを組み立てる
+  const exportParams = new URLSearchParams();
+  if (from) exportParams.set("from", from);
+  else exportParams.set("from", effectiveFrom);
+  if (to) exportParams.set("to", to);
+  else exportParams.set("to", effectiveTo);
+  if (materialId) exportParams.set("materialId", String(materialId));
+  if (reason) exportParams.set("reason", reason);
+  if (direction) exportParams.set("direction", direction);
+  const exportUrl = `/stock-transactions/export?${exportParams.toString()}`;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">入出庫履歴</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          全 {total} 件{transactions.length < total ? `（表示 ${transactions.length} 件）` : ""}
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">入出庫履歴</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            全 {total} 件{transactions.length < total ? `（表示 ${transactions.length} 件）` : ""}
+          </p>
+        </div>
+        <a
+          href={exportUrl}
+          className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          CSVエクスポート
+        </a>
       </div>
 
       {/* 検索フォーム */}
