@@ -99,6 +99,10 @@ export default async function ManufacturingOrderDetailPage({
       shipments: {
         orderBy: [{ shippedAt: "desc" }, { id: "desc" }],
       },
+      testInspections: {
+        orderBy: [{ testDate: "desc" }, { id: "desc" }],
+        include: { _count: { select: { items: true } } },
+      },
     },
   });
   if (!order) notFound();
@@ -563,6 +567,76 @@ export default async function ManufacturingOrderDetailPage({
                   </button>
                 ) : null}
               </form>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* 試験検査記録 */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">
+            試験検査記録（{order.testInspections.length}件）
+          </h2>
+          <Link
+            href={`/manufacturing-orders/${order.id}/test-records/new`}
+            className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            新規作成
+          </Link>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white">
+          {order.testInspections.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-slate-500">
+              まだ試験記録がありません。
+            </p>
+          ) : (
+            order.testInspections.map((tr) => (
+              <div
+                key={tr.id}
+                className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-3 last:border-b-0"
+              >
+                <div className="flex-1 min-w-[16rem]">
+                  <Link
+                    href={`/manufacturing-orders/${order.id}/test-records/${tr.id}`}
+                    className="font-medium text-slate-900 hover:underline"
+                  >
+                    記録 #{tr.id}
+                  </Link>
+                  {tr.isSimplified ? (
+                    <span className="ml-2 rounded bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+                      簡易版
+                    </span>
+                  ) : null}
+                  {tr.overallResult ? (
+                    <span
+                      className={`ml-2 rounded px-2 py-0.5 text-xs font-medium ${tr.overallResult === "OK" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}
+                    >
+                      {tr.overallResult === "OK" ? "適" : "否"}
+                    </span>
+                  ) : null}
+                  <div className="text-xs text-slate-400">
+                    {tr.testDate ? tr.testDate.toISOString().slice(0, 10) : "—"}
+                    {" ／ "}
+                    試験者：{tr.testedBy ?? "—"}
+                    {" ／ "}
+                    試験項目：{tr._count.items}件
+                  </div>
+                </div>
+                <Link
+                  href={`/manufacturing-orders/${order.id}/test-records/${tr.id}`}
+                  className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  編集
+                </Link>
+                <Link
+                  href={`/manufacturing-orders/${order.id}/test-records/${tr.id}/print`}
+                  target="_blank"
+                  className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  印刷
+                </Link>
+              </div>
             ))
           )}
         </div>
