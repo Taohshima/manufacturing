@@ -98,6 +98,13 @@ export default async function ManufacturingOrderDetailPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/manufacturing-orders/${order.id}/print`}
+            target="_blank"
+            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            指図書を印刷
+          </Link>
           {order.status === "PLANNED" ? (
             <form action={setStatusInProgress}>
               <input type="hidden" name="id" value={order.id} />
