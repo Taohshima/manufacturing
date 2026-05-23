@@ -3,7 +3,13 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { CheckResult } from "@prisma/client";
+import type {
+  ApprovalState,
+  CheckResult,
+  ExistenceState,
+  ShipmentDecisionStatus,
+  SuitabilityState,
+} from "@prisma/client";
 
 function decOrNull(v: FormDataEntryValue | null): string | null {
   if (v == null) return null;
@@ -235,4 +241,180 @@ export async function deleteOrder(formData: FormData) {
   }
   revalidatePath("/manufacturing-orders");
   redirect("/manufacturing-orders");
+}
+
+// ─────────────────────────────────────────────────────────────
+// 出荷可否決定通知（様式1-1）
+// ─────────────────────────────────────────────────────────────
+
+function parseApproval(v: FormDataEntryValue | null): ApprovalState | null {
+  const s = v == null ? "" : String(v).trim();
+  if (s === "YES_OK" || s === "YES_NG" || s === "NO") return s;
+  return null;
+}
+function parseSuitability(v: FormDataEntryValue | null): SuitabilityState | null {
+  const s = v == null ? "" : String(v).trim();
+  if (s === "YES_FIT" || s === "YES_UNFIT" || s === "NO") return s;
+  return null;
+}
+function parseExistence(v: FormDataEntryValue | null): ExistenceState | null {
+  const s = v == null ? "" : String(v).trim();
+  if (s === "YES" || s === "NO") return s;
+  return null;
+}
+function parseDecision(v: FormDataEntryValue | null): ShipmentDecisionStatus {
+  const s = v == null ? "" : String(v).trim();
+  return s === "REJECTED" ? "REJECTED" : "APPROVED";
+}
+
+export async function createShipmentDecision(formData: FormData) {
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(manufacturingOrderId)) throw new Error("invalid order id");
+  await prisma.shipmentDecision.create({
+    data: {
+      manufacturingOrderId,
+      decision: parseDecision(formData.get("decision")),
+      decidedAt: dateOrNull(formData.get("decidedAt")),
+      decidedBy: textOrNull(formData.get("decidedBy")),
+      check1ManufacturerDecisionRecord: parseApproval(
+        formData.get("check1ManufacturerDecisionRecord"),
+      ),
+      check2TestReport: parseSuitability(formData.get("check2TestReport")),
+      check3ProductQualityInfo: parseExistence(
+        formData.get("check3ProductQualityInfo"),
+      ),
+      check4MaterialQualityInfo: parseExistence(
+        formData.get("check4MaterialQualityInfo"),
+      ),
+      check5DeviationCheck: parseApproval(formData.get("check5DeviationCheck")),
+      specialNotes: textOrNull(formData.get("specialNotes")),
+    },
+  });
+  revalidatePath(`/manufacturing-orders/${manufacturingOrderId}`);
+  redirect(`/manufacturing-orders/${manufacturingOrderId}?saved=1`);
+}
+
+export async function updateShipmentDecision(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(id) || !Number.isFinite(manufacturingOrderId)) {
+    throw new Error("invalid id");
+  }
+  await prisma.shipmentDecision.update({
+    where: { id },
+    data: {
+      decision: parseDecision(formData.get("decision")),
+      decidedAt: dateOrNull(formData.get("decidedAt")),
+      decidedBy: textOrNull(formData.get("decidedBy")),
+      check1ManufacturerDecisionRecord: parseApproval(
+        formData.get("check1ManufacturerDecisionRecord"),
+      ),
+      check2TestReport: parseSuitability(formData.get("check2TestReport")),
+      check3ProductQualityInfo: parseExistence(
+        formData.get("check3ProductQualityInfo"),
+      ),
+      check4MaterialQualityInfo: parseExistence(
+        formData.get("check4MaterialQualityInfo"),
+      ),
+      check5DeviationCheck: parseApproval(formData.get("check5DeviationCheck")),
+      specialNotes: textOrNull(formData.get("specialNotes")),
+    },
+  });
+  revalidatePath(`/manufacturing-orders/${manufacturingOrderId}`);
+  redirect(`/manufacturing-orders/${manufacturingOrderId}?saved=1`);
+}
+
+export async function deleteShipmentDecision(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(id) || !Number.isFinite(manufacturingOrderId)) {
+    throw new Error("invalid id");
+  }
+  await prisma.shipmentDecision.delete({ where: { id } });
+  revalidatePath(`/manufacturing-orders/${manufacturingOrderId}`);
+  redirect(`/manufacturing-orders/${manufacturingOrderId}?saved=1`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 市場出荷記録（様式1-2）
+// ─────────────────────────────────────────────────────────────
+
+function parseDecisionOptional(
+  v: FormDataEntryValue | null,
+): ShipmentDecisionStatus | null {
+  const s = v == null ? "" : String(v).trim();
+  if (s === "APPROVED" || s === "REJECTED") return s;
+  return null;
+}
+
+export async function addShipment(formData: FormData) {
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(manufacturingOrderId)) throw new Error("invalid order id");
+  const sdIdRaw = formData.get("shipmentDecisionId");
+  const shipmentDecisionId =
+    sdIdRaw && String(sdIdRaw).trim() !== "" ? Number(sdIdRaw) : null;
+  await prisma.shipment.create({
+    data: {
+      manufacturingOrderId,
+      shipmentDecisionId:
+        shipmentDecisionId && Number.isFinite(shipmentDecisionId)
+          ? shipmentDecisionId
+          : null,
+      decisionDate: dateOrNull(formData.get("decisionDate")),
+      decision: parseDecisionOptional(formData.get("decision")),
+      shippedAt: dateOrNull(formData.get("shippedAt")),
+      destination: textOrNull(formData.get("destination")),
+      shippedQty: decOrNull(formData.get("shippedQty")),
+      remainingStock: decOrNull(formData.get("remainingStock")),
+      notes: textOrNull(formData.get("notes")),
+      confirmedAt: dateOrNull(formData.get("confirmedAt")),
+      confirmedBy: textOrNull(formData.get("confirmedBy")),
+      specialNotes: textOrNull(formData.get("specialNotes")),
+    },
+  });
+  revalidatePath(`/manufacturing-orders/${manufacturingOrderId}`);
+  redirect(`/manufacturing-orders/${manufacturingOrderId}?saved=1`);
+}
+
+export async function updateShipment(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(id) || !Number.isFinite(manufacturingOrderId)) {
+    throw new Error("invalid id");
+  }
+  const sdIdRaw = formData.get("shipmentDecisionId");
+  const shipmentDecisionId =
+    sdIdRaw && String(sdIdRaw).trim() !== "" ? Number(sdIdRaw) : null;
+  await prisma.shipment.update({
+    where: { id },
+    data: {
+      shipmentDecisionId:
+        shipmentDecisionId && Number.isFinite(shipmentDecisionId)
+          ? shipmentDecisionId
+          : null,
+      decisionDate: dateOrNull(formData.get("decisionDate")),
+      decision: parseDecisionOptional(formData.get("decision")),
+      shippedAt: dateOrNull(formData.get("shippedAt")),
+      destination: textOrNull(formData.get("destination")),
+      shippedQty: decOrNull(formData.get("shippedQty")),
+      remainingStock: decOrNull(formData.get("remainingStock")),
+      notes: textOrNull(formData.get("notes")),
+      confirmedAt: dateOrNull(formData.get("confirmedAt")),
+      confirmedBy: textOrNull(formData.get("confirmedBy")),
+      specialNotes: textOrNull(formData.get("specialNotes")),
+    },
+  });
+  revalidatePath(`/manufacturing-orders/${manufacturingOrderId}`);
+  redirect(`/manufacturing-orders/${manufacturingOrderId}?saved=1`);
+}
+
+export async function deleteShipment(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(id) || !Number.isFinite(manufacturingOrderId)) {
+    throw new Error("invalid id");
+  }
+  await prisma.shipment.delete({ where: { id } });
+  revalidatePath(`/manufacturing-orders/${manufacturingOrderId}`);
+  redirect(`/manufacturing-orders/${manufacturingOrderId}?saved=1`);
 }

@@ -2,8 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type {
+  ApprovalState,
+  ExistenceState,
   ManufacturingOrderStatus,
   Prisma,
+  ShipmentDecisionStatus,
+  SuitabilityState,
 } from "@prisma/client";
 import {
   updateManufacturingOrder,
@@ -12,7 +16,32 @@ import {
   cancelOrder,
   deleteOrder,
   setStatusInProgress,
+  createShipmentDecision,
+  updateShipmentDecision,
+  deleteShipmentDecision,
+  addShipment,
+  updateShipment,
+  deleteShipment,
 } from "./actions";
+
+const APPROVAL_LABEL: Record<ApprovalState, string> = {
+  YES_OK: "有・可",
+  YES_NG: "有・否",
+  NO: "無",
+};
+const SUITABILITY_LABEL: Record<SuitabilityState, string> = {
+  YES_FIT: "有・適",
+  YES_UNFIT: "有・不適",
+  NO: "無",
+};
+const EXISTENCE_LABEL: Record<ExistenceState, string> = {
+  YES: "有",
+  NO: "無",
+};
+const DECISION_LABEL: Record<ShipmentDecisionStatus, string> = {
+  APPROVED: "可",
+  REJECTED: "否",
+};
 
 const STATUS_LABEL: Record<ManufacturingOrderStatus, string> = {
   PLANNED: "予定",
@@ -63,6 +92,12 @@ export default async function ManufacturingOrderDetailPage({
       ingredients: {
         orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
         include: { material: { include: { category: true } } },
+      },
+      shipmentDecisions: {
+        orderBy: [{ decidedAt: "desc" }, { id: "desc" }],
+      },
+      shipments: {
+        orderBy: [{ shippedAt: "desc" }, { id: "desc" }],
       },
     },
   });
@@ -532,7 +567,441 @@ export default async function ManufacturingOrderDetailPage({
           )}
         </div>
       </div>
+
+      {/* 出荷可否決定通知（様式1-1） */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">
+            出荷可否決定通知（{order.shipmentDecisions.length}件）
+          </h2>
+        </div>
+        <div className="space-y-3">
+          {order.shipmentDecisions.length === 0 ? (
+            <p className="rounded-lg border border-slate-200 bg-white px-3 py-6 text-center text-sm text-slate-500">
+              まだ判定がありません。下のフォームから作成してください。
+            </p>
+          ) : (
+            order.shipmentDecisions.map((sd) => (
+              <div
+                key={sd.id}
+                className="space-y-3 rounded-lg border border-slate-200 bg-white p-4"
+              >
+              <form
+                action={updateShipmentDecision}
+                className="space-y-3"
+              >
+                <input type="hidden" name="id" value={sd.id} />
+                <input type="hidden" name="manufacturingOrderId" value={order.id} />
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm">
+                    判定 #{sd.id} ／{" "}
+                    <span
+                      className={`rounded px-2 py-0.5 text-xs font-medium ${sd.decision === "APPROVED" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}
+                    >
+                      {DECISION_LABEL[sd.decision]}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/manufacturing-orders/${order.id}/shipment-decision/${sd.id}/print`}
+                      target="_blank"
+                      className="rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      印刷
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <SelectField
+                    name="check1ManufacturerDecisionRecord"
+                    label="① 製造所からの出荷可否の決定の記録"
+                    value={sd.check1ManufacturerDecisionRecord}
+                    options={[
+                      ["", "（未選択）"],
+                      ["YES_OK", APPROVAL_LABEL.YES_OK],
+                      ["YES_NG", APPROVAL_LABEL.YES_NG],
+                      ["NO", APPROVAL_LABEL.NO],
+                    ]}
+                  />
+                  <SelectField
+                    name="check2TestReport"
+                    label="② 試験検査成績書"
+                    value={sd.check2TestReport}
+                    options={[
+                      ["", "（未選択）"],
+                      ["YES_FIT", SUITABILITY_LABEL.YES_FIT],
+                      ["YES_UNFIT", SUITABILITY_LABEL.YES_UNFIT],
+                      ["NO", SUITABILITY_LABEL.NO],
+                    ]}
+                  />
+                  <SelectField
+                    name="check3ProductQualityInfo"
+                    label="③ 製品の品質・安全性情報"
+                    value={sd.check3ProductQualityInfo}
+                    options={[
+                      ["", "（未選択）"],
+                      ["YES", EXISTENCE_LABEL.YES],
+                      ["NO", EXISTENCE_LABEL.NO],
+                    ]}
+                  />
+                  <SelectField
+                    name="check4MaterialQualityInfo"
+                    label="④ 原材料の品質・安全性情報"
+                    value={sd.check4MaterialQualityInfo}
+                    options={[
+                      ["", "（未選択）"],
+                      ["YES", EXISTENCE_LABEL.YES],
+                      ["NO", EXISTENCE_LABEL.NO],
+                    ]}
+                  />
+                  <SelectField
+                    name="check5DeviationCheck"
+                    label="⑤ 出荷判定基準逸脱と措置"
+                    value={sd.check5DeviationCheck}
+                    options={[
+                      ["", "（未選択）"],
+                      ["YES_OK", APPROVAL_LABEL.YES_OK],
+                      ["YES_NG", APPROVAL_LABEL.YES_NG],
+                      ["NO", APPROVAL_LABEL.NO],
+                    ]}
+                  />
+                  <Field label="決定">
+                    <select name="decision" defaultValue={sd.decision} className="input">
+                      <option value="APPROVED">{DECISION_LABEL.APPROVED}</option>
+                      <option value="REJECTED">{DECISION_LABEL.REJECTED}</option>
+                    </select>
+                  </Field>
+                  <Field label="決定年月日">
+                    <input
+                      name="decidedAt"
+                      type="date"
+                      defaultValue={fmtDate(sd.decidedAt)}
+                      className="input"
+                    />
+                  </Field>
+                  <Field label="決定者" full>
+                    <input
+                      name="decidedBy"
+                      defaultValue={sd.decidedBy ?? ""}
+                      className="input"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="特記事項" full>
+                  <textarea
+                    name="specialNotes"
+                    rows={2}
+                    defaultValue={sd.specialNotes ?? ""}
+                    className="input"
+                  />
+                </Field>
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="submit"
+                    className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    更新
+                  </button>
+                </div>
+
+              </form>
+              <DeleteRowForm
+                action={deleteShipmentDecision}
+                id={sd.id}
+                manufacturingOrderId={order.id}
+                label="この判定を削除"
+              />
+              </div>
+            ))
+          )}
+
+          {/* 追加フォーム */}
+          <form
+            action={createShipmentDecision}
+            className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4"
+          >
+            <input type="hidden" name="manufacturingOrderId" value={order.id} />
+            <h3 className="text-sm font-semibold">新しい判定を作成</h3>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="決定">
+                <select name="decision" defaultValue="APPROVED" className="input">
+                  <option value="APPROVED">{DECISION_LABEL.APPROVED}</option>
+                  <option value="REJECTED">{DECISION_LABEL.REJECTED}</option>
+                </select>
+              </Field>
+              <Field label="決定年月日">
+                <input
+                  name="decidedAt"
+                  type="date"
+                  defaultValue={today()}
+                  className="input"
+                />
+              </Field>
+              <Field label="決定者">
+                <input name="decidedBy" className="input" />
+              </Field>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                判定を作成
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* 市場出荷記録（様式1-2） */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">
+            市場出荷記録（{order.shipments.length}件）
+          </h2>
+          <Link
+            href={`/manufacturing-orders/${order.id}/shipments/print`}
+            target="_blank"
+            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            出荷記録を印刷
+          </Link>
+        </div>
+        <div className="space-y-3">
+          {order.shipments.length === 0 ? (
+            <p className="rounded-lg border border-slate-200 bg-white px-3 py-6 text-center text-sm text-slate-500">
+              まだ出荷記録がありません。下のフォームから追加してください。
+            </p>
+          ) : (
+            order.shipments.map((sh) => (
+              <div
+                key={sh.id}
+                className="space-y-3 rounded-lg border border-slate-200 bg-white p-4"
+              >
+              <form
+                action={updateShipment}
+                className="space-y-3"
+              >
+                <input type="hidden" name="id" value={sh.id} />
+                <input type="hidden" name="manufacturingOrderId" value={order.id} />
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="出荷年月日">
+                    <input
+                      name="shippedAt"
+                      type="date"
+                      defaultValue={fmtDate(sh.shippedAt)}
+                      className="input"
+                    />
+                  </Field>
+                  <Field label="出荷先">
+                    <input
+                      name="destination"
+                      defaultValue={sh.destination ?? ""}
+                      className="input"
+                    />
+                  </Field>
+                  <Field label="出荷数量">
+                    <input
+                      name="shippedQty"
+                      type="number"
+                      step="0.0001"
+                      defaultValue={num(sh.shippedQty)}
+                      className="input"
+                    />
+                  </Field>
+                  <Field label="出荷可否決定年月日">
+                    <input
+                      name="decisionDate"
+                      type="date"
+                      defaultValue={fmtDate(sh.decisionDate)}
+                      className="input"
+                    />
+                  </Field>
+                  <Field label="出荷の可否">
+                    <select name="decision" defaultValue={sh.decision ?? ""} className="input">
+                      <option value="">（未設定）</option>
+                      <option value="APPROVED">{DECISION_LABEL.APPROVED}</option>
+                      <option value="REJECTED">{DECISION_LABEL.REJECTED}</option>
+                    </select>
+                  </Field>
+                  <Field label="紐付ける判定">
+                    <select
+                      name="shipmentDecisionId"
+                      defaultValue={sh.shipmentDecisionId ?? ""}
+                      className="input"
+                    >
+                      <option value="">（未指定）</option>
+                      {order.shipmentDecisions.map((sd) => (
+                        <option key={sd.id} value={sd.id}>
+                          判定 #{sd.id} ／ {DECISION_LABEL[sd.decision]} ／{" "}
+                          {fmtDate(sd.decidedAt) || "—"}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="在庫数量">
+                    <input
+                      name="remainingStock"
+                      type="number"
+                      step="0.0001"
+                      defaultValue={num(sh.remainingStock)}
+                      className="input"
+                    />
+                  </Field>
+                  <Field label="確認年月日">
+                    <input
+                      name="confirmedAt"
+                      type="date"
+                      defaultValue={fmtDate(sh.confirmedAt)}
+                      className="input"
+                    />
+                  </Field>
+                  <Field label="品質保証責任者">
+                    <input
+                      name="confirmedBy"
+                      defaultValue={sh.confirmedBy ?? ""}
+                      className="input"
+                    />
+                  </Field>
+                </div>
+                <Field label="特記事項" full>
+                  <input
+                    name="specialNotes"
+                    defaultValue={sh.specialNotes ?? ""}
+                    className="input"
+                  />
+                </Field>
+                <Field label="備考" full>
+                  <input name="notes" defaultValue={sh.notes ?? ""} className="input" />
+                </Field>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    更新
+                  </button>
+                </div>
+
+              </form>
+              <DeleteRowForm
+                action={deleteShipment}
+                id={sh.id}
+                manufacturingOrderId={order.id}
+                label="この出荷記録を削除"
+              />
+              </div>
+            ))
+          )}
+
+          {/* 追加フォーム */}
+          <form
+            action={addShipment}
+            className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4"
+          >
+            <input type="hidden" name="manufacturingOrderId" value={order.id} />
+            <h3 className="text-sm font-semibold">新しい出荷記録を追加</h3>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="出荷年月日">
+                <input
+                  name="shippedAt"
+                  type="date"
+                  defaultValue={today()}
+                  className="input"
+                />
+              </Field>
+              <Field label="出荷先">
+                <input name="destination" className="input" />
+              </Field>
+              <Field label="出荷数量">
+                <input name="shippedQty" type="number" step="0.0001" className="input" />
+              </Field>
+              <Field label="紐付ける判定">
+                <select name="shipmentDecisionId" defaultValue="" className="input">
+                  <option value="">（未指定）</option>
+                  {order.shipmentDecisions.map((sd) => (
+                    <option key={sd.id} value={sd.id}>
+                      判定 #{sd.id} ／ {DECISION_LABEL[sd.decision]}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="出荷の可否">
+                <select name="decision" defaultValue="" className="input">
+                  <option value="">（未設定）</option>
+                  <option value="APPROVED">{DECISION_LABEL.APPROVED}</option>
+                  <option value="REJECTED">{DECISION_LABEL.REJECTED}</option>
+                </select>
+              </Field>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                出荷記録を追加
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function SelectField({
+  name,
+  label,
+  value,
+  options,
+}: {
+  name: string;
+  label: string;
+  value: string | null;
+  options: [string, string][];
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-slate-600">
+      <span>{label}</span>
+      <select name={name} defaultValue={value ?? ""} className="input">
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function DeleteRowForm({
+  action,
+  id,
+  manufacturingOrderId,
+  label,
+}: {
+  action: (formData: FormData) => void | Promise<void>;
+  id: number;
+  manufacturingOrderId: number;
+  label: string;
+}) {
+  return (
+    <form action={action} className="flex justify-end">
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="manufacturingOrderId" value={manufacturingOrderId} />
+      <button
+        type="submit"
+        className="text-xs text-red-600 hover:text-red-800 hover:underline"
+      >
+        {label}
+      </button>
+    </form>
   );
 }
 
