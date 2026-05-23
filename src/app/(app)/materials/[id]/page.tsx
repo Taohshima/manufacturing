@@ -65,7 +65,7 @@ export default async function MaterialDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
           <Link
             href="/materials"
@@ -81,6 +81,12 @@ export default async function MaterialDetailPage({
             </span>
           </p>
         </div>
+        <Link
+          href={`/purchase-orders/new?materialId=${material.id}`}
+          className="rounded bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+        >
+          この資材で発注
+        </Link>
       </div>
 
       {sp.saved ? (
