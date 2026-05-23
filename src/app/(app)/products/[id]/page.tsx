@@ -85,15 +85,23 @@ export default async function ProductDetailPage({
             {product.standardNo ? ` ・ 基準番号 ${product.standardNo}` : ""}
           </p>
         </div>
-        <form action={deleteProduct}>
-          <input type="hidden" name="id" value={product.id} />
-          <button
-            type="submit"
-            className="rounded border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/manufacturing-orders/new?productId=${product.id}`}
+            className="rounded bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600"
           >
-            削除
-          </button>
-        </form>
+            この製品で指図作成
+          </Link>
+          <form action={deleteProduct}>
+            <input type="hidden" name="id" value={product.id} />
+            <button
+              type="submit"
+              className="rounded border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+            >
+              削除
+            </button>
+          </form>
+        </div>
       </div>
 
       {sp.saved ? (
