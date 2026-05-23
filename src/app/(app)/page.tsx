@@ -47,6 +47,9 @@ export default async function DashboardPage() {
     monthlyArrived,
     pendingManufacturingCount,
     pendingPurchaseCount,
+    untestedOrders,
+    undecidedOrders,
+    unshippedOrders,
   ] = await Promise.all([
     // 在庫不足アラート用：未完了の指図に紐づく原料の需要
     prisma.manufacturingOrderIngredient.findMany({
@@ -118,6 +121,31 @@ export default async function DashboardPage() {
     prisma.purchaseOrder.count({
       where: { status: { in: ["PLANNED", "ORDERED"] } },
     }),
+    // 完了したが未試験
+    prisma.manufacturingOrder.findMany({
+      where: { status: "COMPLETED", testInspections: { none: {} } },
+      orderBy: [{ instructedAt: "desc" }, { id: "desc" }],
+      include: { product: true },
+      take: 10,
+    }),
+    // 完了したが未判定（出荷可否決定通知未作成）
+    prisma.manufacturingOrder.findMany({
+      where: { status: "COMPLETED", shipmentDecisions: { none: {} } },
+      orderBy: [{ instructedAt: "desc" }, { id: "desc" }],
+      include: { product: true, _count: { select: { testInspections: true } } },
+      take: 10,
+    }),
+    // 判定済みだが未出荷
+    prisma.manufacturingOrder.findMany({
+      where: {
+        status: "COMPLETED",
+        shipmentDecisions: { some: {} },
+        shipments: { none: {} },
+      },
+      orderBy: [{ instructedAt: "desc" }, { id: "desc" }],
+      include: { product: true },
+      take: 10,
+    }),
   ]);
 
   // 在庫不足アラートの計算
@@ -168,6 +196,10 @@ export default async function DashboardPage() {
         />
         <KpiTile label="在庫不足アラート" value={shortfalls.length} tone="warn" />
         <KpiTile label="到着遅延" value={overdueArrivals.length} tone="warn" />
+        <KpiTile label="未試験（完了済）" value={untestedOrders.length} tone="warn" />
+        <KpiTile label="未判定" value={undecidedOrders.length} tone="warn" />
+        <KpiTile label="未出荷（判定済）" value={unshippedOrders.length} tone="warn" />
+        <KpiTile label="今月の完了" value={monthlyCompleted} />
       </div>
 
       {/* アラート2列 */}
@@ -344,6 +376,94 @@ export default async function DashboardPage() {
                 ))}
               </tbody>
             </table>
+          )}
+        </Card>
+      </div>
+
+      {/* GMP出荷フロー */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card title="未試験のロット" hint="完了済みで試験検査記録なし">
+          {untestedOrders.length === 0 ? (
+            <Empty>該当なし</Empty>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {untestedOrders.map((o) => (
+                <li key={o.id} className="px-3 py-2 text-sm">
+                  <Link
+                    href={`/manufacturing-orders/${o.id}/test-records/new`}
+                    className="block hover:bg-slate-50"
+                  >
+                    <span className="font-medium text-slate-900">
+                      {o.product.salesName}
+                    </span>
+                    <span className="ml-2 text-xs text-slate-400">
+                      {o.lotNumber ? `ロット ${o.lotNumber} ／ ` : ""}
+                      指図 #{o.id}
+                    </span>
+                    <div className="mt-0.5 text-xs text-emerald-700">
+                      → 試験記録を作成
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="未判定のロット" hint="完了済みで出荷可否決定通知なし">
+          {undecidedOrders.length === 0 ? (
+            <Empty>該当なし</Empty>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {undecidedOrders.map((o) => (
+                <li key={o.id} className="px-3 py-2 text-sm">
+                  <Link
+                    href={`/manufacturing-orders/${o.id}`}
+                    className="block hover:bg-slate-50"
+                  >
+                    <span className="font-medium text-slate-900">
+                      {o.product.salesName}
+                    </span>
+                    <span className="ml-2 text-xs text-slate-400">
+                      {o.lotNumber ? `ロット ${o.lotNumber} ／ ` : ""}
+                      指図 #{o.id}
+                    </span>
+                    <div className="mt-0.5 text-xs text-slate-500">
+                      試験 {o._count.testInspections}件 →{" "}
+                      <span className="text-emerald-700">判定を作成</span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="未出荷のロット" hint="判定済みで出荷記録なし">
+          {unshippedOrders.length === 0 ? (
+            <Empty>該当なし</Empty>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {unshippedOrders.map((o) => (
+                <li key={o.id} className="px-3 py-2 text-sm">
+                  <Link
+                    href={`/manufacturing-orders/${o.id}`}
+                    className="block hover:bg-slate-50"
+                  >
+                    <span className="font-medium text-slate-900">
+                      {o.product.salesName}
+                    </span>
+                    <span className="ml-2 text-xs text-slate-400">
+                      {o.lotNumber ? `ロット ${o.lotNumber} ／ ` : ""}
+                      指図 #{o.id}
+                    </span>
+                    <div className="mt-0.5 text-xs text-emerald-700">
+                      → 出荷記録を追加
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
         </Card>
       </div>
