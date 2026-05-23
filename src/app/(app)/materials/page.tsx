@@ -76,6 +76,12 @@ export default async function MaterialsPage({
         </div>
         <div className="flex gap-2">
           <Link
+            href="/materials/inventory-count"
+            className="rounded bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+          >
+            棚卸モード
+          </Link>
+          <Link
             href="/materials/new"
             className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
