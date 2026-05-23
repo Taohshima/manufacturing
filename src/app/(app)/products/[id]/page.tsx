@@ -68,7 +68,7 @@ export default async function ProductDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link
             href="/products"
@@ -119,7 +119,7 @@ export default async function ProductDetailPage({
 
       {/* 配合（BOM） */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold">
             配合（BOM）／ {product.recipes.length} 品目
           </h2>

@@ -37,14 +37,14 @@ export default async function ProductsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">製品マスタ</h1>
           <p className="mt-1 text-sm text-slate-600">
             登録 {total} 件{q ? `／ 絞り込み結果 ${products.length} 件` : null}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             href="/products/new"
             className="rounded bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"

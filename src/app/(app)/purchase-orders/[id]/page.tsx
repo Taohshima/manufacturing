@@ -65,7 +65,7 @@ export default async function PurchaseOrderDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <Link
             href="/purchase-orders"
@@ -73,7 +73,7 @@ export default async function PurchaseOrderDetailPage({
           >
             ← 一覧へ戻る
           </Link>
-          <h1 className="mt-1 flex items-center gap-3 text-2xl font-bold">
+          <h1 className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2 text-2xl font-bold">
             {order.material.name}
             <span
               className={`rounded px-2 py-0.5 text-sm font-medium ${STATUS_STYLE[order.status]}`}
