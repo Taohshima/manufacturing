@@ -23,8 +23,8 @@ const IMPORTERS: Importer[] = [
   {
     href: "/import/products",
     title: "製品マスタ＋配合（BOM）",
-    description: "販売名で突合。レシピもまとめて取込。",
-    status: "wip",
+    description: "販売名で突合。製品本体と配合(BOM) を別CSVで取込。",
+    status: "ready",
   },
   {
     href: "/import/manufacturing-orders",
