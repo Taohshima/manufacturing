@@ -22,6 +22,10 @@ import {
   addShipment,
   updateShipment,
   deleteShipment,
+  addPackaging,
+  updatePackaging,
+  deletePackaging,
+  populatePackagingFromBom,
 } from "./actions";
 
 const APPROVAL_LABEL: Record<ApprovalState, string> = {
@@ -103,9 +107,18 @@ export default async function ManufacturingOrderDetailPage({
         orderBy: [{ testDate: "desc" }, { id: "desc" }],
         include: { _count: { select: { items: true } } },
       },
+      packagingItems: {
+        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+        include: { material: { include: { category: true } } },
+      },
     },
   });
   if (!order) notFound();
+
+  const packagingMaterials = await prisma.material.findMany({
+    where: { division: "PACKAGING" },
+    orderBy: { name: "asc" },
+  });
 
   const editable = order.status === "PLANNED" || order.status === "IN_PROGRESS";
 
@@ -572,6 +585,151 @@ export default async function ManufacturingOrderDetailPage({
         </div>
       </div>
 
+      {/* 包装表示 */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold">
+            包装表示（{order.packagingItems.length}件）
+          </h2>
+          <form action={populatePackagingFromBom}>
+            <input type="hidden" name="manufacturingOrderId" value={order.id} />
+            <button className="rounded border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50">
+              BOMの包装資材から取込
+            </button>
+          </form>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white">
+          {order.packagingItems.length === 0 ? (
+            <p className="px-3 py-6 text-center text-sm text-slate-500">
+              包装表示行がありません。下のフォームから追加するか、BOMから取込んでください。
+            </p>
+          ) : (
+            order.packagingItems.map((p) => (
+              <div
+                key={p.id}
+                className="flex flex-wrap items-end gap-2 border-b border-slate-100 p-3 last:border-b-0"
+              >
+                <form
+                  action={updatePackaging}
+                  className="flex flex-wrap items-end gap-2"
+                >
+                  <input type="hidden" name="id" value={p.id} />
+                  <input type="hidden" name="manufacturingOrderId" value={order.id} />
+                  <SmallField label="順" w="w-16">
+                    <input
+                      name="sortOrder"
+                      type="number"
+                      defaultValue={p.sortOrder}
+                      className="input"
+                    />
+                  </SmallField>
+                  <SmallField label="資材名" w="flex-1 min-w-[12rem]">
+                    <input
+                      name="materialName"
+                      defaultValue={p.materialName}
+                      required
+                      className="input"
+                    />
+                  </SmallField>
+                  <SmallField label="資材品番" w="w-32">
+                    <input
+                      name="materialCode"
+                      defaultValue={p.materialCode ?? ""}
+                      className="input"
+                    />
+                  </SmallField>
+                  <SmallField label="使用数量" w="w-24">
+                    <input
+                      name="usedQty"
+                      type="number"
+                      step="0.0001"
+                      defaultValue={p.usedQty != null ? Number(p.usedQty) : ""}
+                      className="input"
+                    />
+                  </SmallField>
+                  <SmallField label="残数量" w="w-24">
+                    <input
+                      name="remainingQty"
+                      type="number"
+                      step="0.0001"
+                      defaultValue={
+                        p.remainingQty != null ? Number(p.remainingQty) : ""
+                      }
+                      className="input"
+                    />
+                  </SmallField>
+                  <SmallField label="紐付け資材" w="w-56">
+                    <select
+                      name="materialId"
+                      defaultValue={p.materialId ?? ""}
+                      className="input"
+                    >
+                      <option value="">（手書きのみ）</option>
+                      {packagingMaterials.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </SmallField>
+                  <SmallField label="メモ" w="flex-1 min-w-[10rem]">
+                    <input name="notes" defaultValue={p.notes ?? ""} className="input" />
+                  </SmallField>
+                  <button className="rounded border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    更新
+                  </button>
+                </form>
+                <form action={deletePackaging}>
+                  <input type="hidden" name="id" value={p.id} />
+                  <input type="hidden" name="manufacturingOrderId" value={order.id} />
+                  <button className="rounded border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50">
+                    削除
+                  </button>
+                </form>
+              </div>
+            ))
+          )}
+        </div>
+
+        <form
+          action={addPackaging}
+          className="flex flex-wrap items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3"
+        >
+          <input type="hidden" name="manufacturingOrderId" value={order.id} />
+          <SmallField label="順" w="w-16">
+            <input name="sortOrder" type="number" className="input" />
+          </SmallField>
+          <SmallField label="資材名" w="flex-1 min-w-[12rem]">
+            <input name="materialName" required className="input" />
+          </SmallField>
+          <SmallField label="資材品番" w="w-32">
+            <input name="materialCode" className="input" />
+          </SmallField>
+          <SmallField label="使用数量" w="w-24">
+            <input name="usedQty" type="number" step="0.0001" className="input" />
+          </SmallField>
+          <SmallField label="残数量" w="w-24">
+            <input name="remainingQty" type="number" step="0.0001" className="input" />
+          </SmallField>
+          <SmallField label="紐付け資材" w="w-56">
+            <select name="materialId" defaultValue="" className="input">
+              <option value="">（手書きのみ）</option>
+              {packagingMaterials.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </SmallField>
+          <SmallField label="メモ" w="flex-1 min-w-[10rem]">
+            <input name="notes" className="input" />
+          </SmallField>
+          <button className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800">
+            追加
+          </button>
+        </form>
+      </div>
+
       {/* 試験検査記録 */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -1026,6 +1184,23 @@ export default async function ManufacturingOrderDetailPage({
         </div>
       </div>
     </div>
+  );
+}
+
+function SmallField({
+  label,
+  w,
+  children,
+}: {
+  label: string;
+  w: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className={`flex flex-col gap-1 text-xs text-slate-600 ${w}`}>
+      <span>{label}</span>
+      {children}
+    </label>
   );
 }
 

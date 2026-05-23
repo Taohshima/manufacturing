@@ -418,3 +418,112 @@ export async function deleteShipment(formData: FormData) {
   revalidatePath(`/manufacturing-orders/${manufacturingOrderId}`);
   redirect(`/manufacturing-orders/${manufacturingOrderId}?saved=1`);
 }
+
+// ─────────────────────────────────────────────────────────────
+// 包装表示行（ManufacturingOrderPackaging）
+// ─────────────────────────────────────────────────────────────
+
+function packagingDone(orderId: number) {
+  revalidatePath(`/manufacturing-orders/${orderId}`);
+  redirect(`/manufacturing-orders/${orderId}?saved=1`);
+}
+
+export async function addPackaging(formData: FormData) {
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(manufacturingOrderId)) throw new Error("invalid order id");
+  const materialIdRaw = formData.get("materialId");
+  const materialId =
+    materialIdRaw && String(materialIdRaw).trim() !== "" ? Number(materialIdRaw) : null;
+  await prisma.manufacturingOrderPackaging.create({
+    data: {
+      manufacturingOrderId,
+      materialId: materialId && Number.isFinite(materialId) ? materialId : null,
+      materialName: String(formData.get("materialName") ?? "").trim(),
+      materialCode: textOrNull(formData.get("materialCode")),
+      usedQty: decOrNull(formData.get("usedQty")),
+      remainingQty: decOrNull(formData.get("remainingQty")),
+      sortOrder: intOrNull(formData.get("sortOrder")) ?? 0,
+      notes: textOrNull(formData.get("notes")),
+    },
+  });
+  packagingDone(manufacturingOrderId);
+}
+
+export async function updatePackaging(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(id) || !Number.isFinite(manufacturingOrderId)) {
+    throw new Error("invalid id");
+  }
+  const materialIdRaw = formData.get("materialId");
+  const materialId =
+    materialIdRaw && String(materialIdRaw).trim() !== "" ? Number(materialIdRaw) : null;
+  await prisma.manufacturingOrderPackaging.update({
+    where: { id },
+    data: {
+      materialId: materialId && Number.isFinite(materialId) ? materialId : null,
+      materialName: String(formData.get("materialName") ?? "").trim(),
+      materialCode: textOrNull(formData.get("materialCode")),
+      usedQty: decOrNull(formData.get("usedQty")),
+      remainingQty: decOrNull(formData.get("remainingQty")),
+      sortOrder: intOrNull(formData.get("sortOrder")) ?? 0,
+      notes: textOrNull(formData.get("notes")),
+    },
+  });
+  packagingDone(manufacturingOrderId);
+}
+
+export async function deletePackaging(formData: FormData) {
+  const id = Number(formData.get("id"));
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(id) || !Number.isFinite(manufacturingOrderId)) {
+    throw new Error("invalid id");
+  }
+  await prisma.manufacturingOrderPackaging.delete({ where: { id } });
+  packagingDone(manufacturingOrderId);
+}
+
+// 配合(BOM)の包装資材 (Material.division=PACKAGING) を ManufacturingOrderPackaging へコピー
+// 既に登録済みの materialId はスキップする。
+export async function populatePackagingFromBom(formData: FormData) {
+  const manufacturingOrderId = Number(formData.get("manufacturingOrderId"));
+  if (!Number.isFinite(manufacturingOrderId)) throw new Error("invalid order id");
+
+  const order = await prisma.manufacturingOrder.findUnique({
+    where: { id: manufacturingOrderId },
+    include: {
+      ingredients: { include: { material: true } },
+      packagingItems: true,
+    },
+  });
+  if (!order) {
+    redirect(`/manufacturing-orders/${manufacturingOrderId}?error=not_found`);
+  }
+
+  const existingMaterialIds = new Set(
+    order!.packagingItems
+      .map((p) => p.materialId)
+      .filter((v): v is number => v != null),
+  );
+  const targets = order!.ingredients.filter(
+    (ing) =>
+      ing.material.division === "PACKAGING" &&
+      !existingMaterialIds.has(ing.materialId),
+  );
+
+  if (targets.length === 0) {
+    redirect(
+      `/manufacturing-orders/${manufacturingOrderId}?error=${encodeURIComponent("BOMに未取込の包装資材がありません")}`,
+    );
+  }
+
+  await prisma.manufacturingOrderPackaging.createMany({
+    data: targets.map((ing, i) => ({
+      manufacturingOrderId,
+      materialId: ing.materialId,
+      materialName: ing.material.name,
+      sortOrder: ing.sortOrder ?? i,
+    })),
+  });
+  packagingDone(manufacturingOrderId);
+}

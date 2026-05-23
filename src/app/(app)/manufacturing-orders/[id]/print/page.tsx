@@ -37,6 +37,9 @@ export default async function ManufacturingOrderPrintPage({
         orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
         include: { material: true },
       },
+      packagingItems: {
+        orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+      },
     },
   });
   if (!order) notFound();
@@ -265,6 +268,37 @@ export default async function ManufacturingOrderPrintPage({
             </tr>
           </tbody>
         </table>
+
+        {/* 包装表示 */}
+        {order.packagingItems.length > 0 ? (
+          <>
+            <h2 className="text-sm font-semibold">包装表示</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ width: "3em" }}>No</th>
+                  <th>資材名</th>
+                  <th style={{ width: "7em" }}>資材品番</th>
+                  <th style={{ width: "6em" }}>使用数量</th>
+                  <th style={{ width: "6em" }}>残数量</th>
+                  <th>備考</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.packagingItems.map((p, i) => (
+                  <tr key={p.id}>
+                    <td style={{ textAlign: "right" }}>{i + 1}</td>
+                    <td>{p.materialName}</td>
+                    <td>{p.materialCode ?? ""}</td>
+                    <td style={{ textAlign: "right" }}>{fmtQty(p.usedQty)}</td>
+                    <td style={{ textAlign: "right" }}>{fmtQty(p.remainingQty)}</td>
+                    <td>{p.notes ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        ) : null}
 
         {/* 備考 */}
         {order.notes ? (
