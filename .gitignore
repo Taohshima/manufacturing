@@ -7,6 +7,7 @@ out/
 .vercel
 .DS_Store
 *.log
+data/rakuten_daily_*.csv
 .idea/
 .vscode/
 next-env.d.ts
