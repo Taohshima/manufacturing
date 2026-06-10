@@ -11,3 +11,4 @@ out/
 .vscode/
 next-env.d.ts
 tsconfig.tsbuildinfo
+exports/
