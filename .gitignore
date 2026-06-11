@@ -11,3 +11,6 @@ out/
 .vscode/
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# Rakuten RMS output
+data/rakuten/*.csv
