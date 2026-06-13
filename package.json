@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "tsx prisma/seed.ts",
-    "auth:hash": "tsx scripts/hash-password.ts"
+    "auth:hash": "tsx scripts/hash-password.ts",
+    "rakuten:daily": "tsx scripts/fetch-rakuten-daily.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
