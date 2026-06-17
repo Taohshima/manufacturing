@@ -1,0 +1,2 @@
+﻿date,status,note
+2026-06-16,ERROR,RAKUTEN_SERVICE_SECRET and RAKUTEN_LICENSE_KEY are not set — extraction attempted but aborted
