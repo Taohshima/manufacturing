@@ -11,3 +11,6 @@ out/
 .vscode/
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# 楽天RMSデータ出力（CSVは除外、ステータスファイルは管理対象）
+data/rakuten/*.csv

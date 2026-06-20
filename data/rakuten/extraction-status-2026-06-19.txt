@@ -1,0 +1,14 @@
+楽天RMS 日次データ抽出
+対象日: 2026-06-19
+実行日時: 2026-06-20T01:34:35.849Z
+ステータス: 失敗
+理由: Rakuten RMS credentials not found. Set RAKUTEN_SERVICE_SECRET and RAKUTEN_LICENSE_KEY environment variables.
+
+必要な環境変数:
+  RAKUTEN_SERVICE_SECRET  - RMSサービスシークレット
+  RAKUTEN_LICENSE_KEY     - RMSライセンスキー
+
+取得を設定するには:
+  1. 楽天RMS > システム・WEB API設定 でAPIキーを取得
+  2. 上記の環境変数を .env に設定
+  3. npx tsx scripts/rakuten-daily-extract.ts を再実行
