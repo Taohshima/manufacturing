@@ -1,0 +1,3 @@
+﻿# RAKUTEN_SERVICE_SECRET and/or RAKUTEN_LICENSE_KEY environment variables are not set. Skipping API calls.
+date,note
+2026-06-20,RAKUTEN_SERVICE_SECRET and/or RAKUTEN_LICENSE_KEY environment variables are not set. Skipping API calls.
