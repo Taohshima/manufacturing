@@ -11,3 +11,7 @@ out/
 .vscode/
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# Rakuten RMS extraction output (contains potentially sensitive sales data)
+data/rakuten_sales_*.csv
+data/rakuten_sales_*.txt
