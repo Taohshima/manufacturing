@@ -103,7 +103,7 @@
 | ログイン画面 | `/login`。パスワード/PINを入力するシンプルなフォーム |
 | セッション | サーバー側で署名（HMAC-SHA256）したCookieを発行。`HttpOnly`, `Secure`, `SameSite=Lax`, 有効期限7日（環境変数で変更可） |
 | アクセス制御 | Next.js Middleware (`src/middleware.ts`) で `/login` と静的アセット以外を全て保護 |
-| ログアウト | ヘッダーから `/logout` を呼び、Cookieを削除して `/login` へリダイレクト |
+| ログアウト | ヘッダーのフォームから `POST /logout` を呼び、Cookieを削除して `/login` へリダイレクト（GETにするとプリフェッチで誤ってログアウトされるため不可） |
 | レート制限 | 同一IPからの連続失敗を5回でロック（メモリベース、シンプル実装） |
 
 ### ファイル構成（予定）
@@ -118,7 +118,7 @@ src/
     │   ├── page.tsx             # ログインフォーム
     │   └── actions.ts           # Server Action: verify password → Cookie発行
     └── logout/
-        └── route.ts             # GET /logout → Cookie削除
+        └── route.ts             # POST /logout → Cookie削除
 ```
 
 ### 環境変数

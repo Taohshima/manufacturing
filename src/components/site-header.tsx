@@ -66,12 +66,14 @@ export function SiteHeader() {
               </Link>
             );
           })}
-          <Link
-            href="/logout"
-            className="text-slate-500 hover:text-slate-900 hover:underline"
-          >
-            ログアウト
-          </Link>
+          <form action="/logout" method="post" className="contents">
+            <button
+              type="submit"
+              className="text-slate-500 hover:text-slate-900 hover:underline"
+            >
+              ログアウト
+            </button>
+          </form>
         </nav>
 
         <button
@@ -117,12 +119,14 @@ export function SiteHeader() {
                 );
               })}
               <li>
-                <Link
-                  href="/logout"
-                  className="block px-4 py-3 text-sm text-slate-500 hover:bg-slate-50"
-                >
-                  ログアウト
-                </Link>
+                <form action="/logout" method="post">
+                  <button
+                    type="submit"
+                    className="block w-full px-4 py-3 text-left text-sm text-slate-500 hover:bg-slate-50"
+                  >
+                    ログアウト
+                  </button>
+                </form>
               </li>
             </ul>
           </nav>
