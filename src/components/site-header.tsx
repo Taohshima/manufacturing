@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState, useTransition, type MouseEvent } from "react";
 
 type NavItem = { href: string; label: string };
 
@@ -27,10 +27,14 @@ function isActive(pathname: string, href: string): boolean {
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   useEffect(() => {
     setOpen(false);
+    setPendingHref(null);
   }, [pathname]);
 
   useEffect(() => {
@@ -42,25 +46,70 @@ export function SiteHeader() {
     return () => window.removeEventListener("keydown", handler);
   }, [open]);
 
+  // ナビゲーション中はマウスカーソルを「処理中」表示にする。
+  useEffect(() => {
+    if (isPending) {
+      document.body.style.cursor = "progress";
+    } else {
+      document.body.style.cursor = "";
+    }
+    return () => {
+      document.body.style.cursor = "";
+    };
+  }, [isPending]);
+
+  function handleNav(e: MouseEvent<HTMLAnchorElement>, href: string) {
+    // 修飾キー付きクリックや新規タブ等は通常動作に任せる
+    if (e.defaultPrevented) return;
+    if (e.button !== 0) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (pathname === href) {
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    setPendingHref(href);
+    startTransition(() => {
+      router.push(href);
+    });
+  }
+
   return (
     <header className="no-print sticky top-0 z-30 border-b border-slate-200 bg-white">
+      {/* 遷移中に上端を流れる進捗バー */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 top-0 h-0.5 overflow-hidden ${
+          isPending ? "opacity-100" : "opacity-0"
+        } transition-opacity duration-150`}
+      >
+        <div className="h-full w-1/3 animate-[progress_1s_ease-in-out_infinite] bg-slate-700" />
+      </div>
+
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
-        <Link href="/" className="text-base font-semibold sm:text-lg">
+        <Link
+          href="/"
+          onClick={(e) => handleNav(e, "/")}
+          className="text-base font-semibold sm:text-lg"
+        >
           製造管理ツール
         </Link>
 
         <nav className="hidden flex-wrap gap-x-4 gap-y-1 text-sm lg:flex">
           {navItems.map((item) => {
             const active = isActive(pathname, item.href);
+            const pending = pendingHref === item.href;
+            const baseClass = active
+              ? "font-medium text-slate-900 underline underline-offset-4"
+              : "text-slate-700 hover:text-slate-900 hover:underline";
+            const pendingClass = pending ? "opacity-50" : "";
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={
-                  active
-                    ? "font-medium text-slate-900 underline underline-offset-4"
-                    : "text-slate-700 hover:text-slate-900 hover:underline"
-                }
+                onClick={(e) => handleNav(e, item.href)}
+                aria-busy={pending || undefined}
+                className={`${baseClass} ${pendingClass}`.trim()}
               >
                 {item.label}
               </Link>
@@ -103,15 +152,18 @@ export function SiteHeader() {
             <ul className="divide-y divide-slate-100">
               {navItems.map((item) => {
                 const active = isActive(pathname, item.href);
+                const pending = pendingHref === item.href;
+                const baseClass = active
+                  ? "block bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900"
+                  : "block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50";
+                const pendingClass = pending ? "opacity-50" : "";
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={
-                        active
-                          ? "block bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900"
-                          : "block px-4 py-3 text-sm text-slate-700 hover:bg-slate-50"
-                      }
+                      onClick={(e) => handleNav(e, item.href)}
+                      aria-busy={pending || undefined}
+                      className={`${baseClass} ${pendingClass}`.trim()}
                     >
                       {item.label}
                     </Link>
