@@ -1,0 +1,3 @@
+extraction_date,target_date,data_type,status,records_retrieved,notes
+2026-06-24,2026-06-23,sales_by_product,FAILED,0,No Rakuten RMS integration found in codebase
+2026-06-24,2026-06-23,access_count_by_product,FAILED,0,No Rakuten RMS API credentials configured
