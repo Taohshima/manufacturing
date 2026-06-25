@@ -1,0 +1,5 @@
+extraction_date,target_date,step,description,status,reason
+2026-06-25,2026-06-24,1,Sales by product,FAILED,No API credentials configured
+2026-06-25,2026-06-24,2,Access count by product,FAILED,No API credentials configured
+2026-06-25,2026-06-24,3,Compile structured summary,FAILED,No data available
+2026-06-25,2026-06-24,4,Store/export results,FAILED,No data to export
