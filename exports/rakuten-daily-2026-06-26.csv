@@ -1,0 +1,2 @@
+﻿日付,状態,備考
+2026-06-26,エラー,"RAKUTEN_SERVICE_SECRET and/or RAKUTEN_LICENSE_KEY environment variables are not set. Set them in .env and retry."
