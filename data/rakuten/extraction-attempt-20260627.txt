@@ -1,0 +1,16 @@
+Rakuten RMS Extraction Attempt
+Timestamp   : 2026-06-28T01:34:12.793Z
+Target date : 20260627
+Status      : FAILED
+Reason      : Missing credentials.
+
+Required environment variables (not set):
+  RAKUTEN_SERVICE_SECRET  - RMS > API設定 > サービスシークレット
+  RAKUTEN_LICENSE_KEY     - RMS > API設定 > ライセンスキー
+
+How to set them:
+  1. Log into RMS (https://rms.rakuten.co.jp)
+  2. Go to [店舗設定] > [API設定]
+  3. Copy serviceSecret and licenseKey
+  4. Set env vars and re-run:
+     RAKUTEN_SERVICE_SECRET=xxx RAKUTEN_LICENSE_KEY=yyy npx tsx scripts/rakuten-rms-extract.ts
