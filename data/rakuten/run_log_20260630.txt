@@ -1,0 +1,30 @@
+=== Rakuten RMS 日次データ取得ログ ===
+実行日時  : 2026-06-30 (JST)
+対象日    : 2026-06-29 (前日)
+実行結果  : 認証情報未設定のため取得不可
+
+--- 状態 ---
+RAKUTEN_SERVICE_SECRET : 未設定
+RAKUTEN_LICENSE_KEY    : 未設定
+
+--- 必要な手順 ---
+1. 楽天RMS管理画面にログイン
+2. システム設定 > API認証設定 にてサービスシークレットとライセンスキーを取得
+3. .env ファイルまたは環境変数に以下を設定:
+     RAKUTEN_SERVICE_SECRET=<取得したシークレット>
+     RAKUTEN_LICENSE_KEY=<取得したキー>
+4. 以下のコマンドで再実行:
+     npm run rakuten:daily
+   または特定日付を指定:
+     npx tsx scripts/rakuten-daily-report.ts YYYY-MM-DD
+
+--- スクリプト出力ファイル ---
+実行成功時に以下のCSVが生成されます:
+  rakuten_daily_sales_YYYYMMDD.csv     : 商品別売上 (注文件数/販売数量/売上合計)
+  rakuten_daily_traffic_YYYYMMDD.csv   : 商品別アクセス数 (PV数/訪問者数)
+  rakuten_daily_summary_YYYYMMDD.csv   : 上記の結合サマリー + 転換率
+
+--- アクセス数データについて ---
+楽天RMSはアクセス数の公式REST APIを提供していません。
+スクリプトは非公式エンドポイントを試行しますが、取得できない場合は
+RMS管理画面 > 商品管理 > アクセス数分析 からCSVをダウンロードしてください。
