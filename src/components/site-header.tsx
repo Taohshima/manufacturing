@@ -31,11 +31,43 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [linkPending, setLinkPending] = useState(false);
+  const busy = isPending || linkPending;
 
   useEffect(() => {
     setOpen(false);
     setPendingHref(null);
+    setLinkPending(false);
   }, [pathname]);
+
+  // ヘッダー以外のリンク（一覧の行、戻るリンク、新規登録など）をクリックした時にも
+  // 進捗バーとカーソル変化を出す。
+  // loading.tsx（Suspense境界）は、行数の多い画面でサーバーアクション後に本文が
+  // 空のまま確定する不具合を起こしたため使わず、クリックの検知だけで表示している。
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    function onClick(e: globalThis.MouseEvent) {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const target = e.target instanceof Element ? e.target : null;
+      const a = target?.closest("a[href]");
+      if (!(a instanceof HTMLAnchorElement)) return;
+      if (a.closest("header")) return; // ヘッダー内のリンクは handleNav が担当
+      if ((a.target && a.target !== "_self") || a.hasAttribute("download")) return;
+      const url = new URL(a.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname === window.location.pathname) return; // 絞り込み等の同一画面内遷移は対象外
+      if (url.pathname.endsWith("/export")) return; // CSVダウンロードは画面が切り替わらない
+      setLinkPending(true);
+      clearTimeout(timer);
+      // 画面が切り替わらなかった場合に表示が残り続けないための保険
+      timer = setTimeout(() => setLinkPending(false), 10000);
+    }
+    document.addEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -48,7 +80,7 @@ export function SiteHeader() {
 
   // ナビゲーション中はマウスカーソルを「処理中」表示にする。
   useEffect(() => {
-    if (isPending) {
+    if (busy) {
       document.body.style.cursor = "progress";
     } else {
       document.body.style.cursor = "";
@@ -56,7 +88,7 @@ export function SiteHeader() {
     return () => {
       document.body.style.cursor = "";
     };
-  }, [isPending]);
+  }, [busy]);
 
   function handleNav(e: MouseEvent<HTMLAnchorElement>, href: string) {
     // 修飾キー付きクリックや新規タブ等は通常動作に任せる
@@ -80,7 +112,7 @@ export function SiteHeader() {
       <div
         aria-hidden
         className={`pointer-events-none absolute inset-x-0 top-0 h-0.5 overflow-hidden ${
-          isPending ? "opacity-100" : "opacity-0"
+          busy ? "opacity-100" : "opacity-0"
         } transition-opacity duration-150`}
       >
         <div className="h-full w-1/3 animate-[progress_1s_ease-in-out_infinite] bg-slate-700" />

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import type { Division, Prisma } from "@prisma/client";
 import { commitInventoryCount } from "./actions";
+import { SubmitButton } from "./submit-button";
 
 const DIVISION_LABEL: Record<Division, string> = {
   RAW: "原料",
@@ -176,12 +177,7 @@ export default async function InventoryCountPage({
               className="rounded border border-emerald-300 px-2 py-1.5 text-sm"
             />
           </label>
-          <button
-            type="submit"
-            className="rounded bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
-          >
-            一括反映
-          </button>
+          <SubmitButton label="一括反映" />
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -240,12 +236,7 @@ export default async function InventoryCountPage({
 
         {materials.length > 0 ? (
           <div className="flex justify-end">
-            <button
-              type="submit"
-              className="rounded bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
-            >
-              入力済みの行をまとめて反映
-            </button>
+            <SubmitButton label="入力済みの行をまとめて反映" />
           </div>
         ) : null}
       </form>
