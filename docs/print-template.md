@@ -7,9 +7,14 @@
 `ManufacturingOrder` を「製品標準書 ロット記録用紙」の様式で印刷できるようにする。製造現場での記録用紙としてA4 1枚に収める。
 
 実装:
-- ルート: `/manufacturing-orders/[id]/print`
+- ルート: `/manufacturing-orders/[id]/record/print`（製造記録-様式３「製造記録表」）
+  - 原本（【MT】製造記録表フォーマット）と同じ 33 列グリッド・セル結合・太罫線で組んでいる
+  - 配合原料欄は原料のみ（`Material.division = PACKAGING` は除外）。包装表示欄は `ManufacturingOrderPackaging`
+  - アプリに値がある項目は印字、未入力の項目は手書き用の空欄（年月日は「年 月 日」）
+  - 原料8行・包装6行が標準。超える場合は行高さを詰めて A4 1枚に収める
+  - 総量(合計)は全行の単位が同じ場合のみ自動計算
+- 別帳票: `/manufacturing-orders/[id]/print`（製造指図書。アプリ独自レイアウト）
 - ブラウザの印刷ダイアログ（PDF保存可）で出力
-- Tailwindの印刷スタイル（`print:` バリアント）で画面表示と印刷表示を切り分け
 
 ## 帳票レイアウト（A4縦・1製造記録あたり1ページ）
 

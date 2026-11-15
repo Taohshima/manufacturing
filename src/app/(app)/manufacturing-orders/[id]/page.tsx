@@ -153,6 +153,13 @@ export default async function ManufacturingOrderDetailPage({
 
         <div className="flex flex-wrap items-center gap-2">
           <Link
+            href={`/manufacturing-orders/${order.id}/record/print`}
+            target="_blank"
+            className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            製造記録表（様式3）を印刷
+          </Link>
+          <Link
             href={`/manufacturing-orders/${order.id}/print`}
             target="_blank"
             className="rounded border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
